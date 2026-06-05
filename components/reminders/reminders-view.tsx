@@ -12,6 +12,15 @@ import { formatDateIST } from "@/lib/utils/dates";
 import { cn } from "@/lib/utils/cn";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Bell } from "lucide-react";
 
 function urgencyClass(dueDate: string) {
@@ -52,10 +61,16 @@ export function RemindersView() {
   });
 
   return (
-    <>
+    <div className="section-gap">
       <PageHeader
         title="Premium reminders"
         description="Due dates and scheduled reminder alerts"
+        backHref="/dashboard"
+        backLabel="Back to dashboard"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Reminders" },
+        ]}
         actions={
           <div className="flex gap-2">
             <Button
@@ -87,7 +102,7 @@ export function RemindersView() {
       ) : view === "calendar" ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Object.entries(byDate).map(([date, items]) => (
-            <div key={date} className="rounded-card border bg-white p-4 shadow-card">
+            <div key={date} className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/\[0\.06\]">
               <p className="font-semibold">{formatDateIST(date)}</p>
               <p className="text-xs text-lic-neutral-500">{items.length} premium(s)</p>
               <ul className="mt-2 space-y-1 text-sm">
@@ -99,16 +114,16 @@ export function RemindersView() {
           ))}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-card border bg-white shadow-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-lic-blue-50">
+        <TableContainer>
+          <Table>
+            <TableHeader>
+              <TableRow>
                 {["Customer", "Policy", "Due date", "Days", "Premium", "Reminder", "Status", "Actions"].map((h) => (
-                  <th key={h} className="px-3 py-2 text-left text-xs uppercase text-lic-neutral-500">{h}</th>
+                  <TableHead key={h}>{h}</TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {reminders.map((r: {
                 id: string;
                 due_date: string;
@@ -121,33 +136,33 @@ export function RemindersView() {
               }) => {
                 const days = differenceInDays(new Date(r.due_date), new Date());
                 return (
-                  <tr key={r.id} className="border-b">
-                    <td className="px-3 py-2">{r.customer?.full_name}</td>
-                    <td className="px-3 py-2">{r.policy?.policy_number}</td>
-                    <td className="px-3 py-2">{formatDateIST(r.due_date)}</td>
-                    <td className="px-3 py-2">
+                  <TableRow key={r.id} interactive>
+                    <TableCell className="font-medium text-lic-neutral-900">{r.customer?.full_name}</TableCell>
+                    <TableCell mono>{r.policy?.policy_number}</TableCell>
+                    <TableCell>{formatDateIST(r.due_date)}</TableCell>
+                    <TableCell>
                       <span className={cn("rounded-badge px-2 py-0.5 text-xs", urgencyClass(r.due_date))}>
                         {days < 0 ? `${Math.abs(days)}d overdue` : `${days}d`}
                       </span>
-                    </td>
-                    <td className="px-3 py-2">{formatINR(Number(r.policy?.premium_amount))}</td>
-                    <td className="px-3 py-2 text-lic-neutral-500">{r.days_before_due}d before</td>
-                    <td className="px-3 py-2"><Badge>{r.status}</Badge></td>
-                    <td className="px-3 py-2">
+                    </TableCell>
+                    <TableCell>{formatINR(Number(r.policy?.premium_amount))}</TableCell>
+                    <TableCell className="text-lic-neutral-500">{r.days_before_due}d before</TableCell>
+                    <TableCell><Badge>{r.status}</Badge></TableCell>
+                    <TableCell>
                       <div className="flex gap-1">
                         <Link href={`/dashboard/payments/record?policy=${r.policy_id}`}>
                           <Button size="sm">Pay</Button>
                         </Link>
                         <Button variant="ghost" size="sm" onClick={() => dismiss(r.id)}>Dismiss</Button>
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
-    </>
+    </div>
   );
 }

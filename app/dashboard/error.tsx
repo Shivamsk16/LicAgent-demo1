@@ -17,8 +17,8 @@ export default function DashboardError({
 
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="max-w-md rounded-card border bg-white p-8 shadow-card">
-        <h2 className="text-lg font-semibold">Could not load this page</h2>
+      <div className="max-w-md rounded-xl bg-lic-neutral-0 p-8 ring-1 ring-black/[0.06]">
+        <h2 className="text-2xl font-semibold tracking-tight text-lic-neutral-900">Could not load this page</h2>
         <p className="mt-2 text-sm text-lic-neutral-500">
           {error.message || "Please check your connection and try again."}
         </p>

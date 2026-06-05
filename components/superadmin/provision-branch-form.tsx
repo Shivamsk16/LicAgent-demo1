@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { INDIAN_STATES } from "@/lib/constants/states";
 
 export function ProvisionBranchForm({ onSuccess }: { onSuccess?: () => void }) {
@@ -57,7 +58,7 @@ export function ProvisionBranchForm({ onSuccess }: { onSuccess?: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <section>
-        <h3 className="mb-3 text-sm font-semibold text-lic-neutral-800">
+        <h3 className="mb-3 text-sm font-semibold text-lic-neutral-900">
           Branch details
         </h3>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -75,19 +76,14 @@ export function ProvisionBranchForm({ onSuccess }: { onSuccess?: () => void }) {
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="state">State *</Label>
-            <select
-              id="state"
-              name="state"
-              required
-              className="h-9 w-full rounded-btn border border-lic-neutral-200 bg-lic-yellow-100 px-3 text-sm"
-            >
+            <Select id="state" name="state" containerClassName="w-full" required>
               <option value="">Select state</option>
               {INDIAN_STATES.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="address">Address</Label>
@@ -95,7 +91,7 @@ export function ProvisionBranchForm({ onSuccess }: { onSuccess?: () => void }) {
               id="address"
               name="address"
               rows={2}
-              className="w-full rounded-btn border border-lic-neutral-200 bg-lic-yellow-100 px-3 py-2 text-sm"
+              className="w-full rounded-btn border border-lic-neutral-200 bg-lic-neutral-0 px-3 py-2 text-sm text-lic-neutral-800 shadow-xs transition-[border-color,box-shadow] duration-150 ease-out hover:border-lic-neutral-300 focus:border-lic-blue-400 focus:outline-none focus:ring-[3px] focus:ring-lic-blue-400/15"
             />
           </div>
           <div>
@@ -110,7 +106,7 @@ export function ProvisionBranchForm({ onSuccess }: { onSuccess?: () => void }) {
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-semibold text-lic-neutral-800">
+        <h3 className="mb-3 text-sm font-semibold text-lic-neutral-900">
           Subscription
         </h3>
         <div className="flex flex-wrap gap-4">
@@ -128,20 +124,16 @@ export function ProvisionBranchForm({ onSuccess }: { onSuccess?: () => void }) {
           </div>
           <div>
             <Label htmlFor="billing_cycle">Billing cycle</Label>
-            <select
-              id="billing_cycle"
-              name="billing_cycle"
-              className="h-9 w-full rounded-btn border border-lic-neutral-200 bg-lic-yellow-100 px-3 text-sm"
-            >
+            <Select id="billing_cycle" name="billing_cycle" containerClassName="w-full">
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
-            </select>
+            </Select>
           </div>
         </div>
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-semibold text-lic-neutral-800">
+        <h3 className="mb-3 text-sm font-semibold text-lic-neutral-900">
           Branch manager
         </h3>
         <div className="grid gap-3 sm:grid-cols-2">

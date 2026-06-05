@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/shared/page-header";
 import { PaymentReceipt } from "@/components/payments/payment-receipt";
 
 export default function PaymentReceiptPage({
@@ -6,10 +5,5 @@ export default function PaymentReceiptPage({
 }: {
   params: { id: string };
 }) {
-  return (
-    <>
-      <PageHeader title="Payment receipt" />
-      <PaymentReceipt paymentId={params.id} />
-    </>
-  );
+  return <PaymentReceipt paymentId={params.id} />;
 }

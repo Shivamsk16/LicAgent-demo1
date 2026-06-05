@@ -3,101 +3,225 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
+import { DataTableBulkBar } from "@/components/shared/data-table-bulk-bar";
+import { SavedFilters } from "@/components/shared/saved-filters";
+import { MobileFilterSheet } from "@/components/shared/mobile-filter-sheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Alert } from "@/components/ui/alert";
+import { SmartEmptyState } from "@/components/ui/smart-empty-state";
+import { Pagination } from "@/components/ui/pagination";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import {
+  Table, TableBody, TableCell, TableContainer, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { useFilterUrlSync } from "@/lib/hooks/use-filter-url-sync";
+import { useSort } from "@/lib/hooks/use-sort";
+import { downloadCSV, rowsToCSV } from "@/lib/utils/csv";
+import { toast } from "@/lib/toast";
+import type { PaginatedResult } from "@/lib/api/list-params";
 import { formatINR } from "@/lib/utils/currency";
 import { formatDateIST } from "@/lib/utils/dates";
-import { Wallet } from "lucide-react";
+import { Plus, Search, Wallet } from "lucide-react";
 import type { Payment } from "@/types/business";
 
-export function PaymentsLedger() {
-  const [status, setStatus] = useState("all");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+const STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "paid", label: "Paid" },
+  { value: "pending", label: "Pending" },
+  { value: "failed", label: "Failed" },
+  { value: "refunded", label: "Refunded" },
+];
 
-  const qs = new URLSearchParams({
-    ...(status !== "all" && { status }),
-    ...(from && { from }),
-    ...(to && { to }),
+const PAGE_SIZE = 25;
+
+type PaymentsResponse = PaginatedResult<Payment> & {
+  summary: { totalCollected: number };
+};
+
+export function PaymentsLedger() {
+  const searchParams = useSearchParams();
+  const [status, setStatus] = useState(() => searchParams.get("status") ?? "all");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [from, setFrom] = useState(() => searchParams.get("from") ?? "");
+  const [to, setTo] = useState(() => searchParams.get("to") ?? "");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const { sort, order, toggleSort } = useSort("payment_date", "desc");
+  const debouncedSearch = useDebouncedValue(search);
+
+  useFilterUrlSync({
+    q: debouncedSearch || undefined,
+    status: status !== "all" ? status : undefined,
+    from: from || undefined,
+    to: to || undefined,
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["payments", qs.toString()],
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["payments", status, debouncedSearch, from, to, page, sort, order],
     queryFn: async () => {
+      const qs = new URLSearchParams({
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+        sort,
+        order,
+        ...(status !== "all" && { status }),
+        ...(debouncedSearch && { search: debouncedSearch }),
+        ...(from && { from }),
+        ...(to && { to }),
+      });
       const res = await fetch(`/api/payments?${qs}`);
       const json = await res.json();
-      return json.data as { payments: Payment[]; summary: { totalCollected: number } };
+      if (!json.success) throw new Error(json.error?.message);
+      return json.data as PaymentsResponse;
     },
   });
 
-  const payments = data?.payments ?? [];
+  const payments = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const activeFilterCount = [status !== "all", debouncedSearch, from, to].filter(Boolean).length;
+
+  function exportSelected() {
+    const rows = payments.filter((p) => selected.size === 0 || selected.has(p.id));
+    downloadCSV(
+      "payments.csv",
+      rowsToCSV(
+        ["Date", "Customer", "Policy", "Amount", "Status", "Receipt"],
+        rows.map((p) => [
+          p.payment_date,
+          p.customer?.full_name,
+          p.policy?.policy_number,
+          p.amount_paid,
+          p.status,
+          p.receipt_number,
+        ])
+      )
+    );
+    toast.success("Export downloaded", "Your CSV file is ready");
+  }
+
+  const filterFields = (
+    <>
+      <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} containerClassName="w-full md:w-[160px]" aria-label="Payment status">
+        {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </Select>
+      <Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} className="w-full md:w-[160px]" aria-label="From date" />
+      <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} className="w-full md:w-[160px]" aria-label="To date" />
+    </>
+  );
 
   return (
     <>
       <PageHeader
         title="Payment ledger"
+        description="View and filter all recorded premium payments."
+        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Payments" }]}
         actions={
           <Link href="/dashboard/payments/record">
-            <Button>Record payment</Button>
+            <Button><Plus className="h-4 w-4" strokeWidth={1.75} /> Record payment</Button>
           </Link>
         }
       />
-      <div className="mb-4 flex flex-wrap gap-3">
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 rounded-btn border px-2 text-sm">
-          <option value="all">All statuses</option>
-          <option value="paid">Paid</option>
-        </select>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 rounded-btn border px-2 text-sm" />
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 rounded-btn border px-2 text-sm" />
+      <div className="filter-toolbar">
+        <div className="relative min-w-0 flex-1 max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lic-neutral-400" strokeWidth={1.75} />
+          <Input
+            placeholder="Receipt #…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="pl-9"
+            aria-label="Search payments by receipt"
+          />
+        </div>
+        <div className="hidden flex-wrap items-center gap-3 md:flex">
+          {filterFields}
+          <SavedFilters
+            page="payments"
+            currentValues={{ status, search, from, to }}
+            onApply={(v) => {
+              setStatus(v.status ?? "all");
+              setSearch(v.search ?? "");
+              setFrom(v.from ?? "");
+              setTo(v.to ?? "");
+              setPage(1);
+            }}
+          />
+        </div>
+        <MobileFilterSheet activeCount={activeFilterCount}>{filterFields}</MobileFilterSheet>
       </div>
+
       {data?.summary && (
-        <p className="mb-4 text-sm font-medium">
-          Total collected: {formatINR(data.summary.totalCollected)}
-        </p>
+        <div className="inline-flex items-baseline gap-3">
+          <span className="text-[13px] text-lic-neutral-500">Total collected</span>
+          <span className="font-mono text-xl font-semibold tabular-nums tracking-tight text-lic-neutral-900">
+            {formatINR(data.summary.totalCollected)}
+          </span>
+        </div>
       )}
-      {isLoading ? (
+
+      <DataTableBulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
+        <Button variant="secondary" size="sm" onClick={exportSelected}>Export</Button>
+      </DataTableBulkBar>
+
+      {isError ? (
+        <Alert variant="error" title="Could not load payments">
+          {error instanceof Error ? error.message : "Something went wrong."}
+          <button type="button" onClick={() => refetch()} className="mt-2 text-xs font-medium underline">Try again</button>
+        </Alert>
+      ) : isLoading ? (
         <TableSkeleton rows={10} cols={10} />
       ) : payments.length === 0 ? (
-        <EmptyState
-          icon={Wallet}
-          title="No payments recorded"
-          description="Record a premium payment to see it in the ledger."
-          actionLabel="Record payment"
-          actionHref="/dashboard/payments/record"
+        <SmartEmptyState
+          entity="payments"
+          hasFilters={activeFilterCount > 0}
+          onClearFilters={() => { setStatus("all"); setSearch(""); setFrom(""); setTo(""); setPage(1); }}
         />
       ) : (
-        <div className="overflow-x-auto rounded-card border bg-white shadow-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-lic-blue-50">
-                {["Date", "Customer", "Policy", "#", "Paid", "Late fee", "Mode", "Receipt", "Status", ""].map((h) => (
-                  <th key={h} className="px-2 py-2 text-left text-xs uppercase text-lic-neutral-500">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+        <TableContainer title={`${total} payment${total === 1 ? "" : "s"}`}>
+          <Table dense>
+            <TableHeader sticky>
+              <TableRow>
+                <TableHead className="w-10"><input type="checkbox" onChange={() => setSelected(selected.size === payments.length ? new Set() : new Set(payments.map((p) => p.id)))} checked={selected.size === payments.length && payments.length > 0} aria-label="Select all" /></TableHead>
+                <SortableTableHead label="Date" column="payment_date" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} sticky />
+                <TableHead hideOnMobile className="hidden md:table-cell">Customer</TableHead>
+                <TableHead hideOnMobile className="hidden lg:table-cell">Policy</TableHead>
+                <SortableTableHead label="#" column="installment_number" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} />
+                <SortableTableHead label="Paid" column="amount_paid" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} align="right" />
+                <TableHead hideOnMobile className="hidden md:table-cell" align="right">Late fee</TableHead>
+                <TableHead hideOnMobile className="hidden lg:table-cell">Mode</TableHead>
+                <TableHead hideOnMobile className="hidden lg:table-cell">Receipt</TableHead>
+                <SortableTableHead label="Status" column="status" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} />
+                <TableHead align="right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {payments.map((p) => (
-                <tr key={p.id} className="border-b">
-                  <td className="px-2 py-2">{formatDateIST(p.payment_date)}</td>
-                  <td className="px-2 py-2">{p.customer?.full_name}</td>
-                  <td className="px-2 py-2">{p.policy?.policy_number}</td>
-                  <td className="px-2 py-2">{p.installment_number}</td>
-                  <td className="px-2 py-2">{formatINR(Number(p.amount_paid))}</td>
-                  <td className="px-2 py-2">{formatINR(Number(p.late_fee ?? 0))}</td>
-                  <td className="px-2 py-2">{p.payment_mode}</td>
-                  <td className="px-2 py-2">{p.receipt_number ?? "—"}</td>
-                  <td className="px-2 py-2"><Badge>{p.status}</Badge></td>
-                  <td className="px-2 py-2">
+                <TableRow key={p.id} interactive selected={selected.has(p.id)}>
+                  <TableCell><input type="checkbox" checked={selected.has(p.id)} onChange={() => setSelected((prev) => { const n = new Set(prev); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })} aria-label={`Select payment ${p.receipt_number ?? p.id}`} /></TableCell>
+                  <TableCell mono sticky>{formatDateIST(p.payment_date)}</TableCell>
+                  <TableCell hideOnMobile className="hidden md:table-cell truncate">{p.customer?.full_name}</TableCell>
+                  <TableCell mono hideOnMobile className="hidden lg:table-cell">{p.policy?.policy_number}</TableCell>
+                  <TableCell mono>{p.installment_number}</TableCell>
+                  <TableCell mono align="right">{formatINR(Number(p.amount_paid))}</TableCell>
+                  <TableCell mono align="right" hideOnMobile className="hidden md:table-cell">{formatINR(Number(p.late_fee ?? 0))}</TableCell>
+                  <TableCell hideOnMobile className="hidden lg:table-cell">{p.payment_mode}</TableCell>
+                  <TableCell mono hideOnMobile className="hidden lg:table-cell">{p.receipt_number ?? "—"}</TableCell>
+                  <TableCell><Badge variant="active" dot>{p.status}</Badge></TableCell>
+                  <TableCell align="right">
                     <Link href={`/dashboard/payments/${p.id}`}><Button variant="ghost" size="sm">Receipt</Button></Link>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+          <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
+        </TableContainer>
       )}
     </>
   );

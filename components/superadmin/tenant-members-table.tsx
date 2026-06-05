@@ -5,6 +5,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatDateIST } from "@/lib/utils/dates";
 
 interface MemberRow {
@@ -68,7 +78,7 @@ export function TenantMembersTable({
       </div>
 
       {showInvite && (
-        <form onSubmit={invite} className="rounded-card border bg-white p-4 shadow-card">
+        <form onSubmit={invite} className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/\[0\.06\]">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label>Full name</Label>
@@ -80,11 +90,11 @@ export function TenantMembersTable({
             </div>
             <div>
               <Label>Role</Label>
-              <select name="role_name" className="h-9 w-full rounded-btn border px-2 text-sm" required>
+              <Select name="role_name" containerClassName="w-full" required>
                 <option value="agent">Agent</option>
                 <option value="senior_agent">Senior Agent</option>
                 <option value="viewer">Viewer</option>
-              </select>
+              </Select>
             </div>
             <div>
               <Label>Employee ID</Label>
@@ -97,35 +107,33 @@ export function TenantMembersTable({
         </form>
       )}
 
-      <div className="overflow-x-auto rounded-card border bg-white shadow-card">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-lic-blue-50">
+      <TableContainer>
+        <Table>
+          <TableHeader>
+            <TableRow>
               {["Name", "Email", "Employee ID", "Role", "Status", "Joined", "Actions"].map(
                 (h) => (
-                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase text-lic-neutral-500">
-                    {h}
-                  </th>
+                  <TableHead key={h}>{h}</TableHead>
                 )
               )}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {members.map((m) => (
-              <tr key={m.id} className="border-b">
-                <td className="px-3 py-2">{m.user?.full_name ?? "—"}</td>
-                <td className="px-3 py-2">{m.user?.email}</td>
-                <td className="px-3 py-2">{m.employee_id ?? "—"}</td>
-                <td className="px-3 py-2">
+              <TableRow key={m.id} interactive>
+                <TableCell className="font-medium text-lic-neutral-900">{m.user?.full_name ?? "—"}</TableCell>
+                <TableCell>{m.user?.email}</TableCell>
+                <TableCell>{m.employee_id ?? "—"}</TableCell>
+                <TableCell>
                   <Badge>{m.role?.display_name ?? m.role?.name}</Badge>
-                </td>
-                <td className="px-3 py-2">
+                </TableCell>
+                <TableCell>
                   <Badge variant={m.status as "active"}>{m.status}</Badge>
-                </td>
-                <td className="px-3 py-2">
+                </TableCell>
+                <TableCell>
                   {m.joined_at ? formatDateIST(m.joined_at) : "—"}
-                </td>
-                <td className="px-3 py-2">
+                </TableCell>
+                <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {m.status === "active" && (
                       <Button
@@ -155,12 +163,12 @@ export function TenantMembersTable({
                       Remove
                     </Button>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
     </div>
   );
 }

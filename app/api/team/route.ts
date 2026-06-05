@@ -2,51 +2,68 @@ import { getDashboardContext } from "@/lib/auth/dashboard-context";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { inviteTenantMember } from "@/lib/business/invite-member";
 import { apiError, apiSuccess } from "@/lib/api/response";
+import { applySort, paginated, parseListParams } from "@/lib/api/list-params";
 import { z } from "zod";
 import { format } from "date-fns";
 
-export async function GET() {
+const SORT_COLUMNS = {
+  invited_at: "invited_at",
+  status: "status",
+  joined_at: "joined_at",
+};
+
+export async function GET(request: Request) {
   const { error, ctx } = await getDashboardContext();
   if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
   if (ctx.role !== "branch_manager") {
     return apiError("FORBIDDEN", "Branch manager only", 403);
   }
 
+  const { searchParams } = new URL(request.url);
+  const list = parseListParams(searchParams, { defaultSort: "invited_at", defaultOrder: "desc" });
+  const status = searchParams.get("status");
+
   const admin = createAdminClient();
-  const { data: members, error: dbError } = await admin
+  let query = admin
     .from("tenant_members")
     .select(
-      `*, user:users(id, email, full_name, phone), role:roles(id, name, display_name)`
+      `*, user:users(id, email, full_name, phone), role:roles(id, name, display_name)`,
+      { count: "exact" }
     )
     .eq("tenant_id", ctx.tenantId)
-    .neq("status", "removed")
-    .order("invited_at", { ascending: false });
+    .neq("status", "removed");
 
+  if (status && status !== "all") query = query.eq("status", status);
+
+  query = applySort(query, list.sort, list.order, SORT_COLUMNS);
+  query = query.range(list.offset, list.offset + list.pageSize - 1);
+
+  const { data: members, error: dbError, count } = await query;
   if (dbError) return apiError("SERVER_ERROR", dbError.message, 500);
 
   const monthKey = format(new Date(), "yyyy-MM");
   const enriched = await Promise.all(
     (members ?? []).map(async (m) => {
       const uid = m.user_id;
-      const { count: customers } = await admin
-        .from("customers")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", ctx.tenantId)
-        .eq("assigned_agent_id", uid);
-
-      const { count: policies } = await admin
-        .from("policies")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", ctx.tenantId)
-        .eq("agent_id", uid)
-        .eq("status", "in_force");
-
-      const { data: comm } = await admin
-        .from("commissions")
-        .select("net_commission")
-        .eq("tenant_id", ctx.tenantId)
-        .eq("agent_id", uid)
-        .eq("month", monthKey);
+      const [{ count: customers }, { count: policies }, { data: comm }] = await Promise.all([
+        admin
+          .from("customers")
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", ctx.tenantId)
+          .eq("assigned_agent_id", uid),
+        admin
+          .from("policies")
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", ctx.tenantId)
+          .eq("agent_id", uid)
+          .eq("status", "in_force"),
+        admin
+          .from("commissions")
+          .select("net_commission")
+          .eq("tenant_id", ctx.tenantId)
+          .eq("agent_id", uid)
+          .eq("month", monthKey),
+      ]);
 
       const commissionMonth = (comm ?? []).reduce(
         (s, c) => s + Number(c.net_commission),
@@ -57,14 +74,23 @@ export async function GET() {
     })
   );
 
+  const { data: allForStats } = await admin
+    .from("tenant_members")
+    .select("status")
+    .eq("tenant_id", ctx.tenantId)
+    .neq("status", "removed");
+
   const stats = {
-    total: enriched.length,
-    active: enriched.filter((m) => m.status === "active").length,
-    invited: enriched.filter((m) => m.status === "invited").length,
-    suspended: enriched.filter((m) => m.status === "suspended").length,
+    total: allForStats?.length ?? 0,
+    active: allForStats?.filter((m) => m.status === "active").length ?? 0,
+    invited: allForStats?.filter((m) => m.status === "invited").length ?? 0,
+    suspended: allForStats?.filter((m) => m.status === "suspended").length ?? 0,
   };
 
-  return apiSuccess({ members: enriched, stats });
+  return apiSuccess({
+    ...paginated(enriched, count ?? 0, list.page, list.pageSize),
+    stats,
+  });
 }
 
 const inviteSchema = z.object({

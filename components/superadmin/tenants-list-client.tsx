@@ -6,11 +6,12 @@ import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { TenantsTable } from "@/components/superadmin/tenants-table";
 import { INDIAN_STATES } from "@/lib/constants/states";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Building2 } from "lucide-react";
+import { Building2, Search } from "lucide-react";
 import type { TenantWithStats } from "@/types/database";
 
 export function TenantsListClient() {
@@ -49,7 +50,7 @@ export function TenantsListClient() {
   );
 
   return (
-    <>
+    <div className="section-gap">
       <PageHeader
         title="All branches"
         description="Manage LIC branch tenants"
@@ -60,37 +61,40 @@ export function TenantsListClient() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
-        <Input
-          placeholder="Search name, code, city…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
-        <select
+      <div className="filter-bar mb-6">
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lic-neutral-400" strokeWidth={1.75} />
+          <Input
+            placeholder="Search name, code, city…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="h-9 rounded-btn border border-lic-neutral-200 px-2 text-sm"
+          containerClassName="w-[160px]"
         >
           <option value="all">All statuses</option>
           <option value="active">Active</option>
           <option value="pending">Pending</option>
           <option value="suspended">Suspended</option>
-        </select>
-        <select
+        </Select>
+        <Select
           value={plan}
           onChange={(e) => setPlan(e.target.value)}
-          className="h-9 rounded-btn border border-lic-neutral-200 px-2 text-sm"
+          containerClassName="w-[140px]"
         >
           <option value="all">All plans</option>
           <option value="trial">Trial</option>
           <option value="starter">Starter</option>
           <option value="pro">Pro</option>
-        </select>
-        <select
+        </Select>
+        <Select
           value={state}
           onChange={(e) => setState(e.target.value)}
-          className="h-9 max-w-[200px] rounded-btn border border-lic-neutral-200 px-2 text-sm"
+          containerClassName="max-w-[200px]"
         >
           <option value="all">All states</option>
           {INDIAN_STATES.map((s) => (
@@ -98,7 +102,7 @@ export function TenantsListClient() {
               {s}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -114,6 +118,6 @@ export function TenantsListClient() {
       ) : (
         <TenantsTable tenants={tenants} onSuspend={onSuspend} />
       )}
-    </>
+    </div>
   );
 }

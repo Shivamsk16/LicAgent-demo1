@@ -32,7 +32,7 @@ export function ReportsHub() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="section-gap">
       <PageHeader
         title="Reports"
         description={
@@ -40,6 +40,10 @@ export function ReportsHub() {
             ? "View and export branch analytics"
             : "View branch analytics (export requires manager or senior agent)"
         }
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Reports" },
+        ]}
       />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((report) => {
@@ -48,22 +52,22 @@ export function ReportsHub() {
             <Link
               key={report.id}
               href={`/dashboard/reports/${report.id}`}
-              className="rounded-card border bg-white p-5 shadow-card transition-shadow hover:shadow-md"
+              className="group rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06] transition-[box-shadow,transform] duration-fast ease-out hover:ring-black/[0.1] active:scale-[0.99]"
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-btn bg-lic-blue-50">
-                  <Icon className="h-5 w-5 text-lic-blue-600" />
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-lic-neutral-100 transition-colors duration-fast group-hover:bg-lic-neutral-200/60">
+                  <Icon className="h-5 w-5 text-lic-neutral-600" strokeWidth={1.75} />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-lic-neutral-800">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold tracking-tight text-lic-neutral-900">
                     {report.name}
                   </h3>
-                  <p className="mt-1 text-xs text-lic-neutral-500">
+                  <p className="mt-1 text-[13px] leading-relaxed text-lic-neutral-500">
                     {report.description}
                   </p>
                   {report.managerOnly && (
-                    <span className="mt-2 inline-block text-[10px] uppercase tracking-wide text-lic-neutral-400">
-                      Manager
+                    <span className="mt-2 inline-block text-2xs font-medium text-lic-neutral-400">
+                      Manager only
                     </span>
                   )}
                 </div>

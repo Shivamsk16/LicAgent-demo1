@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { DashboardSidebar } from "./dashboard-sidebar";
+import { AppTopbar } from "./app-topbar";
 import { TenantSwitcher } from "./tenant-switcher";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { LogOut, Menu } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useTenantStore } from "@/store/tenant";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { AppChrome } from "@/components/layout/app-chrome";
+import { CommandTrigger } from "@/components/command/command-trigger";
 import type { DashboardRole } from "@/lib/auth/dashboard-context";
 import { cn } from "@/lib/utils/cn";
 
@@ -45,10 +49,11 @@ export function DashboardShell({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <AppChrome>
+    <div className="flex h-screen overflow-hidden bg-lic-neutral-50">
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-40 lg:static",
+          "fixed inset-y-0 left-0 z-overlay lg:static lg:z-auto",
           mobileOpen ? "block" : "hidden lg:block"
         )}
       >
@@ -57,36 +62,44 @@ export function DashboardShell({
       {mobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+          className="fixed inset-0 z-sticky bg-lic-neutral-900/25 backdrop-blur-[1px] lg:hidden"
           onClick={() => setMobileOpen(false)}
+          aria-label="Close menu"
         />
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-lic-neutral-200 bg-white px-4">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="lg:hidden"
-              onClick={() => setMobileOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <span className="text-sm text-lic-neutral-500">
-              {userName ? `Hi, ${userName}` : "Dashboard"}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <NotificationBell />
-            <TenantSwitcher currentTenantId={tenantId} />
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </header>
-        <main className="flex-1 overflow-y-auto bg-lic-neutral-50 p-6">
-          {children}
+        <AppTopbar
+          title={userName ? `Welcome, ${userName}` : "Dashboard"}
+          subtitle={tenantName}
+          mobileOpen={mobileOpen}
+          onMenuToggle={() => setMobileOpen((o) => !o)}
+          actions={
+            <>
+              <CommandTrigger className="md:min-w-[200px] md:max-w-xs md:flex-1" />
+              <Link href="/dashboard/payments/record" className="hidden sm:block">
+                <Button size="sm" variant="secondary">
+                  <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  Record payment
+                </Button>
+              </Link>
+              <NotificationBell />
+              <TenantSwitcher currentTenantId={tenantId} />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={signOut}
+                aria-label="Sign out"
+              >
+                <LogOut className="h-4 w-4" strokeWidth={1.75} />
+              </Button>
+            </>
+          }
+        />
+        <main id="main-content" className="app-main flex-1 overflow-y-auto px-5 py-8 sm:px-8 sm:py-10 lg:px-10 scrollbar-thin" tabIndex={-1}>
+          <div className="page-container page-stack">{children}</div>
         </main>
       </div>
     </div>
+    </AppChrome>
   );
 }

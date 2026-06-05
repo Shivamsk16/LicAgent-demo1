@@ -24,7 +24,18 @@ export default async function EditCustomerPage({
 
   return (
     <>
-      <PageHeader title="Edit customer" />
+      <PageHeader
+        title="Edit customer"
+        description={data.full_name}
+        backHref={`/dashboard/customers/${params.id}`}
+        backLabel="Back to customer"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Customers", href: "/dashboard/customers" },
+          { label: data.full_name, href: `/dashboard/customers/${params.id}` },
+          { label: "Edit" },
+        ]}
+      />
       <CustomerForm initial={data} customerId={params.id} />
     </>
   );

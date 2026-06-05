@@ -3,6 +3,15 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatDateIST } from "@/lib/utils/dates";
 import type { TenantWithStats } from "@/types/database";
 
@@ -22,10 +31,10 @@ export function TenantsTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-card border border-lic-neutral-200 bg-white shadow-card">
-      <table className="w-full min-w-[900px] text-left text-sm">
-        <thead>
-          <tr className="border-b border-lic-neutral-200 bg-lic-blue-50">
+    <TableContainer>
+      <Table className="min-w-[900px]">
+        <TableHeader>
+          <TableRow>
             {[
               "Branch",
               "Code",
@@ -39,35 +48,30 @@ export function TenantsTable({
               "Created",
               "Actions",
             ].map((h) => (
-              <th
-                key={h}
-                className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-lic-neutral-500"
-              >
-                {h}
-              </th>
+              <TableHead key={h}>{h}</TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {tenants.map((t) => (
-            <tr key={t.id} className="border-b border-lic-neutral-200 last:border-0">
-              <td className="px-3 py-2 font-medium">{t.name}</td>
-              <td className="px-3 py-2">{t.branch_code ?? "—"}</td>
-              <td className="px-3 py-2">{t.city ?? "—"}</td>
-              <td className="px-3 py-2">{t.state ?? "—"}</td>
-              <td className="px-3 py-2">
+            <TableRow key={t.id} interactive>
+              <TableCell className="font-medium text-lic-neutral-900">{t.name}</TableCell>
+              <TableCell>{t.branch_code ?? "—"}</TableCell>
+              <TableCell>{t.city ?? "—"}</TableCell>
+              <TableCell>{t.state ?? "—"}</TableCell>
+              <TableCell>
                 <Badge variant={t.plan as "trial"}>{t.plan}</Badge>
-              </td>
-              <td className="px-3 py-2">{t.agent_count ?? 0}</td>
-              <td className="px-3 py-2">{t.policy_count ?? 0}</td>
-              <td className="px-3 py-2">
+              </TableCell>
+              <TableCell>{t.agent_count ?? 0}</TableCell>
+              <TableCell>{t.policy_count ?? 0}</TableCell>
+              <TableCell>
                 <Badge variant={t.status as "active"}>{t.status}</Badge>
-              </td>
-              <td className="px-3 py-2">
+              </TableCell>
+              <TableCell>
                 {t.trial_ends_at ? formatDateIST(t.trial_ends_at) : "—"}
-              </td>
-              <td className="px-3 py-2">{formatDateIST(t.created_at)}</td>
-              <td className="px-3 py-2">
+              </TableCell>
+              <TableCell>{formatDateIST(t.created_at)}</TableCell>
+              <TableCell>
                 <div className="flex gap-1">
                   <Link href={`/superadmin/tenants/${t.id}`}>
                     <Button variant="ghost" size="sm">
@@ -93,11 +97,11 @@ export function TenantsTable({
                     </Button>
                   )}
                 </div>
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 }

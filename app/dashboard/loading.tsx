@@ -1,10 +1,14 @@
-import { StatGridSkeleton } from "@/components/ui/skeleton";
+import { PageHeaderSkeleton, StatGridSkeleton } from "@/components/ui/skeleton";
 
 export default function DashboardLoading() {
   return (
-    <div className="space-y-6 p-2">
-      <div className="h-8 w-48 animate-pulse rounded-md bg-lic-neutral-200" />
-      <StatGridSkeleton count={4} />
+    <div className="section-stack animate-fade-in">
+      <PageHeaderSkeleton />
+      <StatGridSkeleton count={5} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="h-72 rounded-xl bg-black/[0.04] lg:col-span-2" />
+        <div className="h-72 rounded-xl bg-black/[0.04]" />
+      </div>
     </div>
   );
 }

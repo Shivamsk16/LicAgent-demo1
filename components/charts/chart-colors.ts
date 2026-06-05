@@ -1,10 +1,11 @@
 export const CHART_COLORS = {
-  collected: "#F5C842",
-  expected: "#4A90D9",
+  collected: "#E8B820",
+  expected: "#3B7DD8",
   missed: "#A32D2D",
-  primary: "#4A90D9",
-  secondary: "#F5C842",
-  accent: "#2D6A4F",
-  muted: "#888780",
-  palette: ["#F5C842", "#4A90D9", "#2D6A4F", "#A32D2D", "#888780", "#E8A838"],
+  primary: "#3B7DD8",
+  secondary: "#E8B820",
+  accent: "#3B7316",
+  muted: "#71717F",
+  grid: "#E2E2E7",
+  palette: ["#3B7DD8", "#E8B820", "#3B7316", "#A32D2D", "#71717F", "#C4841A"],
 };

@@ -3,6 +3,16 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { CommissionRate } from "@/types/database";
 
 export function CommissionRatesEditor({
@@ -51,25 +61,23 @@ export function CommissionRatesEditor({
 
   return (
     <div className="space-y-6">
-      <div className="overflow-x-auto rounded-card border border-lic-neutral-200 bg-white shadow-card">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-lic-neutral-200 bg-lic-blue-50">
+      <TableContainer>
+        <Table>
+          <TableHeader>
+            <TableRow>
               {["Policy type", "Commission type", "Rate %", "Effective from", "Effective to", "Actions"].map(
                 (h) => (
-                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase text-lic-neutral-500">
-                    {h}
-                  </th>
+                  <TableHead key={h}>{h}</TableHead>
                 )
               )}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rates.map((r) => (
-              <tr key={r.id} className="border-b border-lic-neutral-200">
-                <td className="px-3 py-2 capitalize">{r.policy_type.replace("_", " ")}</td>
-                <td className="px-3 py-2">{r.commission_type.replace("_", " ")}</td>
-                <td className="px-3 py-2">
+              <TableRow key={r.id} interactive>
+                <TableCell className="capitalize">{r.policy_type.replace("_", " ")}</TableCell>
+                <TableCell>{r.commission_type.replace("_", " ")}</TableCell>
+                <TableCell>
                   <Input
                     type="number"
                     step="0.01"
@@ -80,27 +88,27 @@ export function CommissionRatesEditor({
                       if (v !== r.rate_percentage) updateRate(r.id, v);
                     }}
                   />
-                </td>
-                <td className="px-3 py-2">{r.effective_from}</td>
-                <td className="px-3 py-2">{r.effective_to ?? "—"}</td>
-                <td className="px-3 py-2">
+                </TableCell>
+                <TableCell>{r.effective_from}</TableCell>
+                <TableCell>{r.effective_to ?? "—"}</TableCell>
+                <TableCell className="text-lic-neutral-500">
                   {saving === r.id ? "Saving…" : "Edit on blur"}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
 
-      <form onSubmit={addRate} className="rounded-card border border-lic-neutral-200 bg-white p-4 shadow-card">
+      <form onSubmit={addRate} className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06]">
         <h3 className="mb-3 text-sm font-semibold">Add rate</h3>
         <div className="grid gap-3 sm:grid-cols-4">
           <Input name="policy_type" placeholder="Policy type" required />
-          <select name="commission_type" className="h-9 rounded-btn border border-lic-neutral-200 px-2 text-sm" required>
+          <Select name="commission_type" containerClassName="w-full" required>
             <option value="first_year">First year</option>
             <option value="renewal">Renewal</option>
             <option value="bonus">Bonus</option>
-          </select>
+          </Select>
           <Input name="rate_percentage" type="number" placeholder="Rate %" required />
           <Input name="effective_from" type="date" required defaultValue="2024-04-01" />
         </div>

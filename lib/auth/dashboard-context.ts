@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  getActiveMemberships,
+  membershipRole,
+} from "@/lib/auth/memberships";
 import type { Tenant } from "@/types/database";
 
 export type DashboardRole =
@@ -33,13 +37,27 @@ export async function getDashboardContext(): Promise<
   let tenantId = cookieStore.get("active_tenant")?.value;
 
   const admin = createAdminClient();
-  const { data: memberships } = await admin
-    .from("tenant_members")
-    .select("tenant_id, status, roles(name)")
-    .eq("user_id", user.id)
-    .eq("status", "active");
 
-  if (!memberships?.length) return { error: "NO_TENANT", ctx: null };
+  const { data: profile } = await admin
+    .from("users")
+    .select("super_admin")
+    .eq("id", user.id)
+    .single();
+
+  const memberships = await getActiveMemberships(user.id);
+
+  if (!memberships.length) {
+    if (profile?.super_admin) {
+      console.log("[auth-debug]", JSON.stringify({
+        event: "dashboard_context_super_admin_no_tenant",
+        userId: user.id,
+        role: "super_admin",
+        tenantId: null,
+        redirectTo: "FORBIDDEN",
+      }));
+    }
+    return { error: "NO_TENANT", ctx: null };
+  }
 
   if (!tenantId || !memberships.some((m) => m.tenant_id === tenantId)) {
     tenantId = memberships[0].tenant_id;
@@ -47,9 +65,7 @@ export async function getDashboardContext(): Promise<
   const resolvedTenantId = tenantId as string;
 
   const membership = memberships.find((m) => m.tenant_id === resolvedTenantId)!;
-  const rolesRaw = membership.roles as { name: string } | { name: string }[] | null;
-  const roleName = (Array.isArray(rolesRaw) ? rolesRaw[0]?.name : rolesRaw?.name) ?? "agent";
-  const role = roleName as DashboardRole;
+  const role = (membershipRole(membership) || "agent") as DashboardRole;
   const isManager = role === "branch_manager" || role === "senior_agent";
 
   const { data: tenant } = await admin
@@ -69,6 +85,15 @@ export async function getDashboardContext(): Promise<
   ) {
     return { error: "FORBIDDEN", ctx: null };
   }
+
+  console.log("[auth-debug]", JSON.stringify({
+    event: "dashboard_context_resolved",
+    userId: user.id,
+    role,
+    tenantId: resolvedTenantId,
+    resolvedTenant: tenant.name,
+    redirectTo: "next",
+  }));
 
   return {
     error: null,

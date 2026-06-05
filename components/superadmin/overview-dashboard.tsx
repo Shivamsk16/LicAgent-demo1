@@ -2,12 +2,20 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { StatCard } from "@/components/ui/stat-card";
-import { Card, CardTitle } from "@/components/ui/card";
+import {
+  Building2,
+  FileText,
+  IndianRupee,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { StatCard, StatGrid } from "@/components/ui/stat-card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SignupsChart } from "@/components/charts/signups-chart";
 import { PlanDonutChart } from "@/components/charts/plan-donut";
 import { TenantsTable } from "@/components/superadmin/tenants-table";
+import { Alert } from "@/components/ui/alert";
 import { formatINR } from "@/lib/utils/currency";
 import { formatDateIST } from "@/lib/utils/dates";
 import { StatGridSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/skeleton";
@@ -37,8 +45,8 @@ export function OverviewDashboard() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <StatGridSkeleton count={5} />
+      <div className="section-gap">
+        <StatGridSkeleton count={6} />
         <div className="grid gap-6 lg:grid-cols-2">
           <ChartSkeleton />
           <ChartSkeleton />
@@ -49,50 +57,64 @@ export function OverviewDashboard() {
   }
   if (error) {
     return (
-      <p className="text-sm text-lic-red-600">
+      <Alert variant="error" title="Could not load platform stats">
         {error instanceof Error ? error.message : "Failed to load stats. Check Supabase env."}
-      </p>
+      </Alert>
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <Alert variant="warning" title="No platform data">
+        Platform stats are unavailable right now.
+      </Alert>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <StatCard label="Total branches" value={data.totalBranches} accent="blue" />
-        <StatCard label="Active branches" value={data.activeBranches} accent="green" />
-        <StatCard label="Trial branches" value={data.trialBranches} accent="amber" />
-        <StatCard label="Total agents" value={data.totalAgents} accent="blue" />
-        <StatCard label="Active policies" value={data.activePolicies} accent="green" />
-        <StatCard label="Platform MRR" value={formatINR(data.platformMRR)} accent="yellow" />
-      </div>
+    <div className="section-stack">
+      <StatGrid className="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <StatCard label="Total branches" value={data.totalBranches} accent="blue" icon={Building2} />
+        <StatCard label="Active branches" value={data.activeBranches} accent="green" icon={Building2} />
+        <StatCard label="Trial branches" value={data.trialBranches} accent="amber" icon={TrendingUp} />
+        <StatCard label="Total agents" value={data.totalAgents} accent="blue" icon={Users} />
+        <StatCard label="Active policies" value={data.activePolicies} accent="green" icon={FileText} />
+        <StatCard label="Platform MRR" value={formatINR(data.platformMRR)} accent="yellow" icon={IndianRupee} />
+      </StatGrid>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardTitle>Monthly new signups</CardTitle>
-          <div className="mt-4">
-            <SignupsChart data={data.signupsByMonth} />
-          </div>
+          <CardHeader>
+            <CardTitle description="New branch signups per month">
+              Monthly signups
+            </CardTitle>
+          </CardHeader>
+          <SignupsChart data={data.signupsByMonth} />
         </Card>
         <Card>
-          <CardTitle>Plans breakdown</CardTitle>
-          <div className="mt-4">
-            <PlanDonutChart data={data.planBreakdown} />
-          </div>
+          <CardHeader>
+            <CardTitle description="Distribution by subscription plan">
+              Plans breakdown
+            </CardTitle>
+          </CardHeader>
+          <PlanDonutChart data={data.planBreakdown} />
         </Card>
       </div>
 
       {data.expiringTrials.length > 0 && (
-        <Card className="border-lic-amber-600/30 bg-lic-amber-100/30">
-          <CardTitle>Trial expiring in 7 days</CardTitle>
-          <ul className="mt-3 space-y-2">
+        <Card className="border-lic-amber-100 bg-lic-amber-50/50">
+          <CardHeader>
+            <CardTitle description="Branches with trials ending soon">
+              Trial expiring in 7 days
+            </CardTitle>
+          </CardHeader>
+          <ul className="space-y-2">
             {data.expiringTrials.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center justify-between text-sm"
+                className="flex items-center justify-between rounded-md px-2 py-2 text-sm transition-colors hover:bg-lic-amber-50"
               >
-                <span>
+                <span className="text-lic-neutral-700">
                   {t.name} · ends {formatDateIST(t.trial_ends_at)}
                 </span>
                 <Link href={`/superadmin/tenants/${t.id}/settings`}>
@@ -107,8 +129,10 @@ export function OverviewDashboard() {
       )}
 
       <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recent branches</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-lic-neutral-900">
+            Recent branches
+          </h2>
           <Link href="/superadmin/tenants">
             <Button variant="ghost" size="sm">
               View all

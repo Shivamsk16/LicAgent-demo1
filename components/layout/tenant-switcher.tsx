@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { Select } from "@/components/ui/select";
+import { Building2 } from "lucide-react";
 
 export function TenantSwitcher({ currentTenantId }: { currentTenantId: string }) {
   const router = useRouter();
@@ -26,16 +28,20 @@ export function TenantSwitcher({ currentTenantId }: { currentTenantId: string })
   }
 
   return (
-    <select
-      value={currentTenantId}
-      onChange={(e) => switchTenant(e.target.value)}
-      className="h-8 rounded-btn border border-lic-neutral-200 bg-white px-2 text-xs"
-    >
-      {tenants.map((t: { id: string; name: string }) => (
-        <option key={t.id} value={t.id}>
-          {t.name}
-        </option>
-      ))}
-    </select>
+    <div className="flex items-center gap-2">
+      <Building2 className="hidden h-4 w-4 text-lic-neutral-400 sm:block" strokeWidth={1.75} />
+      <Select
+        value={currentTenantId}
+        onChange={(e) => switchTenant(e.target.value)}
+        className="h-8 min-w-[140px] max-w-[200px] text-xs"
+        aria-label="Switch branch"
+      >
+        {tenants.map((t: { id: string; name: string }) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </Select>
+    </div>
   );
 }

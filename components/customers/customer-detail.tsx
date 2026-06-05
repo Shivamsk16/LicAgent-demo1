@@ -5,52 +5,90 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/shared/page-header";
 import { formatDateIST } from "@/lib/utils/dates";
 import { formatINR } from "@/lib/utils/currency";
 import type { Customer, Policy, Payment } from "@/types/business";
 import { KycDocuments } from "@/components/customers/kyc-documents";
+import { Alert } from "@/components/ui/alert";
 import { DetailSkeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const tabs = ["Personal", "KYC", "Policies", "Payments"] as const;
 
 export function CustomerDetail({ customerId }: { customerId: string }) {
   const [tab, setTab] = useState<(typeof tabs)[number]>("Personal");
 
-  const { data: customer } = useQuery({
+  const { data: customer, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["customer", customerId],
     queryFn: async () => {
       const res = await fetch(`/api/customers/${customerId}`);
       const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message ?? "Failed to load customer");
       return json.data as Customer;
     },
   });
 
-  const { data: policies = [] } = useQuery({
+  const { data: policiesData } = useQuery({
     queryKey: ["policies", customerId],
     queryFn: async () => {
-      const res = await fetch(`/api/policies?customer_id=${customerId}`);
+      const res = await fetch(`/api/policies?customer_id=${customerId}&pageSize=50`);
       const json = await res.json();
-      return json.data as Policy[];
+      if (!json.success) throw new Error(json.error?.message);
+      return json.data as { items: Policy[]; total: number };
     },
     enabled: tab === "Policies" || tab === "Payments",
   });
 
+  const policies = policiesData?.items ?? [];
+
   const { data: paymentsData } = useQuery({
-    queryKey: ["payments-customer"],
+    queryKey: ["payments-customer", customerId],
     queryFn: async () => {
-      const res = await fetch("/api/payments");
+      const res = await fetch(`/api/payments?customer_id=${customerId}&pageSize=50`);
       const json = await res.json();
-      const all = (json.data?.payments ?? json.data ?? []) as Payment[];
-      const policyIds = new Set(policies.map((p) => p.id));
-      return all.filter((p: Payment & { policy_id?: string }) =>
-        policyIds.has((p as { policy_id: string }).policy_id)
-      );
+      if (!json.success) throw new Error(json.error?.message);
+      return json.data.items as Payment[];
     },
-    enabled: tab === "Payments" && policies.length > 0,
+    enabled: tab === "Payments",
   });
 
-  if (!customer) return <DetailSkeleton />;
+  if (isLoading) return <DetailSkeleton />;
+
+  if (isError) {
+    return (
+      <Alert variant="error" title="Could not load customer">
+        {error instanceof Error ? error.message : "Something went wrong."}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" onClick={() => refetch()}>
+            Try again
+          </Button>
+          <Link href="/dashboard/customers">
+            <Button size="sm" variant="ghost">Back to customers</Button>
+          </Link>
+        </div>
+      </Alert>
+    );
+  }
+
+  if (!customer) {
+    return (
+      <Alert variant="error" title="Customer not found">
+        This customer may have been removed or you may not have access.
+        <Link href="/dashboard/customers" className="mt-2 block text-xs font-medium underline">
+          Back to customers
+        </Link>
+      </Alert>
+    );
+  }
 
   const initials = customer.full_name
     .split(" ")
@@ -60,39 +98,43 @@ export function CustomerDetail({ customerId }: { customerId: string }) {
     .toUpperCase();
 
   return (
-    <div>
-      <Card className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="flex gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-lic-blue-50 text-lg font-semibold">
-            {initials}
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold">{customer.full_name}</h1>
-            <p className="text-sm text-lic-neutral-500">
-              {customer.customer_code} · {customer.phone}
-            </p>
-            <Badge className="mt-2">{customer.kyc_status}</Badge>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Link href={`/dashboard/customers/${customerId}/edit`}>
-            <Button variant="secondary">Edit</Button>
-          </Link>
-          <Link href={`/dashboard/policies/new?customer=${customerId}`}>
-            <Button>Add policy</Button>
-          </Link>
-        </div>
-      </Card>
+    <div className="section-gap">
+      <PageHeader
+        title={customer.full_name}
+        description={`${customer.customer_code ?? "—"} · ${customer.phone}`}
+        backHref="/dashboard/customers"
+        backLabel="Back to customers"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Customers", href: "/dashboard/customers" },
+          { label: customer.full_name },
+        ]}
+        actions={
+          <>
+            <Link href={`/dashboard/customers/${customerId}/edit`}>
+              <Button variant="secondary">Edit</Button>
+            </Link>
+            <Link href={`/dashboard/policies/new?customer=${customerId}`}>
+              <Button>Add policy</Button>
+            </Link>
+          </>
+        }
+      />
 
-      <nav className="mb-4 flex gap-1 border-b">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-lic-neutral-100 text-sm font-semibold text-lic-neutral-700">
+          {initials}
+        </div>
+        <Badge dot>{customer.kyc_status}</Badge>
+      </div>
+
+      <nav className="detail-tabs">
         {tabs.map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`border-b-2 px-4 py-2 text-sm ${
-              tab === t ? "border-lic-yellow-400 font-medium" : "border-transparent text-lic-neutral-500"
-            }`}
+            className={tab === t ? "detail-tab detail-tab-active" : "detail-tab"}
           >
             {t}
           </button>
@@ -100,56 +142,71 @@ export function CustomerDetail({ customerId }: { customerId: string }) {
       </nav>
 
       {tab === "Personal" && (
-        <dl className="grid gap-3 sm:grid-cols-2 text-sm">
+        <dl className="divide-y divide-black/[0.04]">
           {[
             ["Email", customer.email],
-            ["City", `${customer.city}, ${customer.state}`],
+            ["Alternate phone", customer.alternate_phone],
+            ["Address", [customer.address_line1, customer.address_line2].filter(Boolean).join(", ")],
+            ["City / State", `${customer.city}, ${customer.state}`],
+            ["Pincode", customer.pincode],
             ["PAN", customer.pan_number],
+            ["Aadhaar last 4", customer.aadhaar_last4],
+            ["Occupation", customer.occupation],
+            ["Annual income", customer.annual_income ? formatINR(Number(customer.annual_income)) : null],
+            ["Marital status", customer.marital_status],
             ["Nominee", customer.nominee_name],
+            ["Nominee relation", customer.nominee_relation],
+            ["Nominee DOB", customer.nominee_dob ? formatDateIST(customer.nominee_dob) : null],
             ["DOB", customer.date_of_birth ? formatDateIST(customer.date_of_birth) : "—"],
+            ["Notes", customer.notes],
           ].map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-lic-neutral-500">{k}</dt>
-              <dd>{v ?? "—"}</dd>
+            <div key={k} className="detail-field">
+              <dt className="detail-field-label">{k}</dt>
+              <dd className="detail-field-value">{v ?? "—"}</dd>
             </div>
           ))}
         </dl>
       )}
 
       {tab === "Policies" && (
-        <div className="overflow-x-auto rounded-card border bg-white shadow-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-lic-blue-50">
+        <TableContainer>
+          <Table>
+            <TableHeader>
+              <TableRow>
                 {["Policy #", "Plan", "Premium", "Next due", "Status", ""].map((h) => (
-                  <th key={h} className="px-3 py-2 text-left text-xs uppercase text-lic-neutral-500">{h}</th>
+                  <TableHead key={h || "actions"} align={h === "" ? "right" : "left"}>{h}</TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {policies.map((p) => (
-                <tr key={p.id} className="border-b">
-                  <td className="px-3 py-2">{p.policy_number}</td>
-                  <td className="px-3 py-2">{p.plan_name}</td>
-                  <td className="px-3 py-2">{formatINR(Number(p.premium_amount))}</td>
-                  <td className="px-3 py-2">{p.next_premium_due ? formatDateIST(p.next_premium_due) : "—"}</td>
-                  <td className="px-3 py-2"><Badge>{p.status}</Badge></td>
-                  <td className="px-3 py-2">
+                <TableRow key={p.id} interactive>
+                  <TableCell mono>{p.policy_number}</TableCell>
+                  <TableCell className="font-medium text-lic-neutral-900">{p.plan_name}</TableCell>
+                  <TableCell>{formatINR(Number(p.premium_amount))}</TableCell>
+                  <TableCell>{p.next_premium_due ? formatDateIST(p.next_premium_due) : "—"}</TableCell>
+                  <TableCell><Badge>{p.status}</Badge></TableCell>
+                  <TableCell align="right">
                     <Link href={`/dashboard/policies/${p.id}`}><Button variant="ghost" size="sm">View</Button></Link>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
 
       {tab === "Payments" && (
         <ul className="space-y-2 text-sm">
           {(paymentsData ?? []).map((pay) => (
-            <li key={pay.id} className="rounded-card border bg-white p-3">
-              #{pay.installment_number} · {formatDateIST(pay.payment_date)} · {formatINR(Number(pay.amount_paid))}
-              <Badge className="ml-2">{pay.status}</Badge>
+            <li key={pay.id} className="flex items-center justify-between rounded-lg bg-lic-neutral-0 px-4 py-3 ring-1 ring-inset ring-black/[0.06]">
+              <span>
+                #{pay.installment_number} · {formatDateIST(pay.payment_date)} · {formatINR(Number(pay.amount_paid))}
+                <Badge className="ml-2">{pay.status}</Badge>
+              </span>
+              <Link href={`/dashboard/payments/${pay.id}`}>
+                <Button variant="ghost" size="sm">Receipt</Button>
+              </Link>
             </li>
           ))}
         </ul>

@@ -3,6 +3,17 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
+import { toast } from "@/lib/toast";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const TYPES = [
   { id: "customers", label: "Customers" },
@@ -28,24 +39,32 @@ export function BulkImportWizard() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [skipErrors, setSkipErrors] = useState(true);
+  const [error, setError] = useState("");
 
   async function handlePreview() {
     if (!file) return;
     setLoading(true);
     setResult(null);
+    setError("");
     const fd = new FormData();
     fd.append("file", file);
     fd.append("preview", "true");
     const res = await fetch(`/api/import/${importType}`, { method: "POST", body: fd });
     const json = await res.json();
     setLoading(false);
-    if (json.success) setPreview(json.data);
-    else alert(json.error?.message ?? "Preview failed");
+    if (json.success) {
+      setPreview(json.data);
+    } else {
+      const msg = json.error?.message ?? "Preview failed";
+      setError(msg);
+      toast.error("Preview failed", msg);
+    }
   }
 
   async function runImport() {
     if (!file) return;
     setLoading(true);
+    setError("");
     const fd = new FormData();
     fd.append("file", file);
     if (skipErrors) fd.append("skip_errors", "true");
@@ -59,8 +78,11 @@ export function BulkImportWizard() {
         errors: json.data.errors ?? [],
         status: json.data.status,
       });
+      toast.success("Import complete", `${json.data.success} rows imported`);
     } else {
-      alert(json.error?.message ?? "Import failed");
+      const msg = json.error?.message ?? "Import failed";
+      setError(msg);
+      toast.error("Import failed", msg);
     }
   }
 
@@ -80,10 +102,17 @@ export function BulkImportWizard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="section-gap">
       <PageHeader
         title="Bulk import"
         description="Import customers, policies, or payments from CSV (save Excel as CSV)"
+        backHref="/dashboard/settings"
+        backLabel="Back to settings"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Settings", href: "/dashboard/settings" },
+          { label: "Bulk import" },
+        ]}
       />
 
       <div className="flex flex-wrap gap-2">
@@ -96,6 +125,7 @@ export function BulkImportWizard() {
               setImportType(t.id);
               setPreview(null);
               setResult(null);
+              setError("");
             }}
           >
             {t.label}
@@ -103,7 +133,7 @@ export function BulkImportWizard() {
         ))}
       </div>
 
-      <div className="rounded-card border bg-white p-6 shadow-card space-y-4">
+      <div className="rounded-xl bg-lic-neutral-0 p-6 ring-1 ring-black/\[0\.06\] space-y-4">
         <div className="flex flex-wrap gap-3">
           <Button variant="secondary" size="sm" onClick={downloadTemplate}>
             Download template
@@ -118,6 +148,7 @@ export function BulkImportWizard() {
               setFile(e.target.files?.[0] ?? null);
               setPreview(null);
               setResult(null);
+              setError("");
             }}
             className="text-sm"
           />
@@ -133,6 +164,8 @@ export function BulkImportWizard() {
           Skip invalid rows and import valid ones
         </label>
 
+        {error && <Alert variant="error">{error}</Alert>}
+
         <div className="flex gap-2">
           <Button variant="secondary" disabled={!file || loading} onClick={handlePreview}>
             Preview
@@ -144,35 +177,37 @@ export function BulkImportWizard() {
       </div>
 
       {preview && (
-        <div className="rounded-card border bg-white p-4 shadow-card">
-          <h3 className="font-semibold text-sm">
+        <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/\[0\.06\]">
+          <h3 className="font-semibold text-sm text-lic-neutral-900">
             Preview ({preview.totalRows} rows)
           </h3>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr>
+          <div className="mt-3">
+          <TableContainer>
+            <Table className="text-xs">
+              <TableHeader>
+                <TableRow>
                   {preview.headers.map((h) => (
-                    <th key={h} className="px-2 py-1 text-left border-b">{h}</th>
+                    <TableHead key={h}>{h}</TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {preview.preview.map((row, i) => (
-                  <tr key={i}>
+                  <TableRow key={i}>
                     {preview.headers.map((h) => (
-                      <td key={h} className="px-2 py-1 border-b">{row[h]}</td>
+                      <TableCell key={h}>{row[h]}</TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
+          </TableContainer>
           </div>
         </div>
       )}
 
       {result && (
-        <div className="rounded-card border bg-white p-4 shadow-card">
+        <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/\[0\.06\]">
           <h3 className="font-semibold">Import {result.status}</h3>
           <p className="text-sm mt-1">
             {result.success} succeeded · {result.failed} failed

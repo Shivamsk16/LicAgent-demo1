@@ -122,19 +122,19 @@ export default function InviteCompletePage() {
       <Card className="w-full max-w-md">
         {step === "loading" && (
           <>
-            <h1 className="text-lg font-semibold">Completing invitation…</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-lic-neutral-900">Completing invitation…</h1>
             <p className="mt-2 text-sm text-lic-neutral-500">
               Setting up your account. Please wait.
             </p>
             <div className="mt-6 h-2 overflow-hidden rounded-full bg-lic-neutral-200">
-              <div className="h-full w-1/2 animate-pulse rounded-full bg-lic-yellow-400" />
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-lic-blue-400" />
             </div>
           </>
         )}
 
         {step === "password" && (
           <>
-            <h1 className="text-lg font-semibold">Set your password</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-lic-neutral-900">Set your password</h1>
             <p className="mt-1 text-sm text-lic-neutral-500">
               {email ? `Account: ${email}` : "Create a password to finish joining your branch."}
             </p>
@@ -173,7 +173,7 @@ export default function InviteCompletePage() {
 
         {step === "activating" && (
           <>
-            <h1 className="text-lg font-semibold">Activating your access…</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-lic-neutral-900">Activating your access…</h1>
             <p className="mt-2 text-sm text-lic-neutral-500">
               Linking you to your branch workspace.
             </p>
@@ -182,14 +182,14 @@ export default function InviteCompletePage() {
 
         {step === "success" && (
           <>
-            <h1 className="text-lg font-semibold text-lic-green-600">Welcome!</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-lic-green-600">Welcome!</h1>
             <p className="mt-2 text-sm text-lic-neutral-500">Redirecting to your dashboard…</p>
           </>
         )}
 
         {step === "error" && (
           <>
-            <h1 className="text-lg font-semibold text-lic-red-600">Invitation error</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-lic-red-600">Invitation error</h1>
             <p className="mt-2 text-sm text-lic-neutral-500">{error}</p>
             <div className="mt-6 flex gap-2">
               <Button variant="secondary" onClick={() => router.push("/login")}>

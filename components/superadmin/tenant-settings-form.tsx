@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { INDIAN_STATES } from "@/lib/constants/states";
 import type { Tenant } from "@/types/database";
 
@@ -59,8 +60,8 @@ export function TenantSettingsForm({ tenant }: { tenant: Tenant }) {
 
   return (
     <div className="max-w-xl space-y-8">
-      <form onSubmit={save} className="space-y-4 rounded-card border bg-white p-5 shadow-card">
-        <h3 className="font-semibold">Branch settings</h3>
+      <form onSubmit={save} className="space-y-4 rounded-xl bg-lic-neutral-0 p-6 ring-1 ring-black/\[0\.06\]">
+        <h3 className="font-semibold text-lic-neutral-900">Branch settings</h3>
         <div>
           <Label htmlFor="name">Branch name</Label>
           <Input id="name" name="name" defaultValue={tenant.name} required />
@@ -76,18 +77,13 @@ export function TenantSettingsForm({ tenant }: { tenant: Tenant }) {
           </div>
           <div>
             <Label htmlFor="state">State</Label>
-            <select
-              id="state"
-              name="state"
-              defaultValue={tenant.state ?? ""}
-              className="h-9 w-full rounded-btn border border-lic-neutral-200 px-2 text-sm"
-            >
+            <Select id="state" name="state" defaultValue={tenant.state ?? ""} containerClassName="w-full">
               {INDIAN_STATES.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
         <div>
@@ -96,23 +92,18 @@ export function TenantSettingsForm({ tenant }: { tenant: Tenant }) {
             id="address"
             name="address"
             defaultValue={tenant.address ?? ""}
-            className="w-full rounded-btn border border-lic-neutral-200 px-3 py-2 text-sm"
+            className="w-full rounded-btn border border-lic-neutral-200 bg-lic-neutral-0 px-3 py-2 text-sm text-lic-neutral-800 shadow-xs transition-[border-color,box-shadow] duration-150 ease-out hover:border-lic-neutral-300 focus:border-lic-blue-400 focus:outline-none focus:ring-[3px] focus:ring-lic-blue-400/15"
             rows={2}
           />
         </div>
         <div>
           <Label htmlFor="plan">Plan</Label>
-          <select
-            id="plan"
-            name="plan"
-            defaultValue={tenant.plan}
-            className="h-9 w-full rounded-btn border px-2 text-sm"
-          >
+          <Select id="plan" name="plan" defaultValue={tenant.plan} containerClassName="w-full">
             <option value="trial">Trial</option>
             <option value="starter">Starter</option>
             <option value="pro">Pro</option>
             <option value="enterprise">Enterprise</option>
-          </select>
+          </Select>
         </div>
         <div>
           <Label htmlFor="max_agents">Max agents</Label>
@@ -127,8 +118,8 @@ export function TenantSettingsForm({ tenant }: { tenant: Tenant }) {
         <Button type="submit">Save changes</Button>
       </form>
 
-      <div className="space-y-2 rounded-card border bg-white p-5 shadow-card">
-        <h3 className="font-semibold">Status</h3>
+      <div className="space-y-2 rounded-xl bg-lic-neutral-0 p-6 ring-1 ring-black/\[0\.06\]">
+        <h3 className="font-semibold text-lic-neutral-900">Status</h3>
         {tenant.status === "active" ? (
           <Button variant="danger" onClick={() => setStatus("suspended", "Admin suspended")}>
             Suspend branch

@@ -102,7 +102,7 @@ export default function InviteTokenPage({ params }: { params: { token: string } 
     return (
       <div className="flex min-h-screen items-center justify-center bg-lic-neutral-50 p-4">
         <Card className="w-full max-w-md p-6">
-          <h1 className="text-lg font-semibold">Loading invitation…</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-lic-neutral-900">Loading invitation…</h1>
           <p className="mt-2 text-sm text-lic-neutral-500">Please wait.</p>
         </Card>
       </div>
@@ -113,7 +113,7 @@ export default function InviteTokenPage({ params }: { params: { token: string } 
     return (
       <div className="flex min-h-screen items-center justify-center bg-lic-neutral-50 p-4">
         <Card className="w-full max-w-md p-6 text-center">
-          <h1 className="text-lg font-semibold text-lic-red-600">Invitation unavailable</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-lic-red-600">Invitation unavailable</h1>
           <p className="mt-2 text-sm text-lic-neutral-500">
             {info?.error ?? "This link is invalid or has expired."}
           </p>
@@ -131,13 +131,13 @@ export default function InviteTokenPage({ params }: { params: { token: string } 
   return (
     <div className="flex min-h-screen items-center justify-center bg-lic-neutral-50 p-4">
       <Card className="w-full max-w-md p-6">
-        <h1 className="text-xl font-semibold">Join {info.branchName}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-lic-neutral-900">Join {info.branchName}</h1>
         {info.branchLocation && (
           <p className="text-sm text-lic-neutral-500">{info.branchLocation}</p>
         )}
         {info.roleName && (
           <p className="mt-1 text-sm">
-            Role: <span className="font-medium">{info.roleName}</span>
+            Role: <span className="font-medium text-lic-neutral-900">{info.roleName}</span>
           </p>
         )}
         <p className="mt-4 text-sm text-lic-neutral-500">

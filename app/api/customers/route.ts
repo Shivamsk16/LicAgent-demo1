@@ -4,23 +4,36 @@ import { generateCustomerCode } from "@/lib/business/customer-code";
 import { customerSchema } from "@/lib/utils/validators";
 import { logAction } from "@/lib/audit";
 import { apiError, apiSuccess } from "@/lib/api/response";
+import { applySort, paginated, parseListParams } from "@/lib/api/list-params";
 
-export async function GET(request: Request) {
-  const { error, ctx } = await getDashboardContext();
-  if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
+const SORT_COLUMNS = {
+  full_name: "full_name",
+  created_at: "created_at",
+  customer_code: "customer_code",
+  phone: "phone",
+  city: "city",
+  kyc_status: "kyc_status",
+};
 
-  const { searchParams } = new URL(request.url);
-  const search = searchParams.get("search") ?? "";
-  const kyc = searchParams.get("kyc_status");
-  const sort = searchParams.get("sort") ?? "recent";
+function buildCustomerQuery(
+  admin: ReturnType<typeof createAdminClient>,
+  ctx: NonNullable<Awaited<ReturnType<typeof getDashboardContext>>["ctx"]>,
+  params: URLSearchParams
+) {
+  const search = params.get("search") ?? "";
+  const kyc = params.get("kyc_status");
+  const agent = params.get("agent");
 
-  const admin = createAdminClient();
   let query = admin
     .from("customers")
-    .select(`*, agent:users!assigned_agent_id(id, full_name)`)
+    .select(`*, agent:users!assigned_agent_id(id, full_name)`, { count: "exact" })
     .eq("tenant_id", ctx.tenantId);
 
-  if (!ctx.isManager) query = query.eq("assigned_agent_id", ctx.userId);
+  if (!ctx.isManager) {
+    query = query.eq("assigned_agent_id", ctx.userId);
+  } else if (agent) {
+    query = query.eq("assigned_agent_id", agent);
+  }
   if (search) {
     query = query.or(
       `full_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%,pan_number.ilike.%${search}%`
@@ -28,12 +41,25 @@ export async function GET(request: Request) {
   }
   if (kyc && kyc !== "all") query = query.eq("kyc_status", kyc);
 
-  if (sort === "name") query = query.order("full_name");
-  else query = query.order("created_at", { ascending: false });
+  return query;
+}
 
-  const { data, error: dbError } = await query;
+export async function GET(request: Request) {
+  const { error, ctx } = await getDashboardContext();
+  if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
+
+  const { searchParams } = new URL(request.url);
+  const list = parseListParams(searchParams, { defaultSort: "created_at", defaultOrder: "desc" });
+  const admin = createAdminClient();
+
+  let query = buildCustomerQuery(admin, ctx, searchParams);
+  query = applySort(query, list.sort, list.order, SORT_COLUMNS);
+  query = query.range(list.offset, list.offset + list.pageSize - 1);
+
+  const { data, error: dbError, count } = await query;
   if (dbError) return apiError("SERVER_ERROR", dbError.message, 500);
-  return apiSuccess(data);
+
+  return apiSuccess(paginated(data ?? [], count ?? 0, list.page, list.pageSize));
 }
 
 export async function POST(request: Request) {

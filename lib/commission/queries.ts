@@ -2,6 +2,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { DashboardContext } from "@/lib/auth/dashboard-context";
 import { getFinancialYear } from "@/lib/business/payments";
 import { format, subMonths } from "date-fns";
+import {
+  applySort,
+  paginated,
+  parseListParams,
+  type FilterableQuery,
+  type PaginatedResult,
+  type SortOrder,
+} from "@/lib/api/list-params";
 
 export interface CommissionRow {
   id: string;
@@ -74,7 +82,15 @@ export async function getCommissionSummary(
   return { grossMonth, netMonth, fyTotal, pending };
 }
 
-export async function listCommissions(
+const COMMISSION_SORT = {
+  created_at: "created_at",
+  net_commission: "net_commission",
+  month: "month",
+  status: "status",
+};
+
+function applyCommissionFilters(
+  query: FilterableQuery,
   ctx: DashboardContext,
   filters: {
     month?: string;
@@ -82,19 +98,9 @@ export async function listCommissions(
     commissionType?: string;
     policyType?: string;
     agentId?: string;
-    limit?: number;
+    status?: string;
   }
-) {
-  const admin = createAdminClient();
-  let query = admin
-    .from("commissions")
-    .select(
-      `*, policy:policies(policy_number, plan_name, policy_type, customer:customers(full_name)),
-       agent:users!agent_id(full_name)`
-    )
-    .eq("tenant_id", ctx.tenantId)
-    .order("created_at", { ascending: false });
-
+): FilterableQuery {
   if (!ctx.isManager) query = query.eq("agent_id", ctx.userId);
   else if (filters.agentId) query = query.eq("agent_id", filters.agentId);
   if (filters.month) query = query.eq("month", filters.month);
@@ -105,11 +111,67 @@ export async function listCommissions(
   if (filters.policyType && filters.policyType !== "all") {
     query = query.eq("policy_type", filters.policyType);
   }
-  if (filters.limit) query = query.limit(filters.limit);
+  if (filters.status && filters.status !== "all") {
+    query = query.eq("status", filters.status);
+  }
+  return query;
+}
 
-  const { data, error } = await query;
+export async function listCommissions(
+  ctx: DashboardContext,
+  filters: {
+    month?: string;
+    fy?: string;
+    commissionType?: string;
+    policyType?: string;
+    agentId?: string;
+    status?: string;
+    page?: number;
+    pageSize?: number;
+    sort?: string;
+    order?: SortOrder;
+    limit?: number;
+  }
+): Promise<PaginatedResult<CommissionRow> | CommissionRow[]> {
+  const admin = createAdminClient();
+  const isPaginated = filters.page !== undefined || filters.pageSize !== undefined;
+
+  if (!isPaginated && filters.limit) {
+    let query = admin
+      .from("commissions")
+      .select(
+        `*, policy:policies(policy_number, plan_name, policy_type, customer:customers(full_name)),
+         agent:users!agent_id(full_name)`
+      )
+      .eq("tenant_id", ctx.tenantId)
+      .order("created_at", { ascending: false });
+    query = applyCommissionFilters(query, ctx, filters);
+    query = query.limit(filters.limit);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data ?? []) as CommissionRow[];
+  }
+
+  const page = filters.page ?? 1;
+  const pageSize = filters.pageSize ?? 25;
+  const offset = (page - 1) * pageSize;
+  const order = filters.order ?? "desc";
+
+  let dataQuery = admin
+    .from("commissions")
+    .select(
+      `*, policy:policies(policy_number, plan_name, policy_type, customer:customers(full_name)),
+       agent:users!agent_id(full_name)`,
+      { count: "exact" }
+    )
+    .eq("tenant_id", ctx.tenantId);
+  dataQuery = applyCommissionFilters(dataQuery, ctx, filters);
+  dataQuery = applySort(dataQuery, filters.sort, order, COMMISSION_SORT);
+  dataQuery = dataQuery.range(offset, offset + pageSize - 1);
+
+  const { data, error, count } = await dataQuery;
   if (error) throw new Error(error.message);
-  return (data ?? []) as CommissionRow[];
+  return paginated((data ?? []) as CommissionRow[], count ?? 0, page, pageSize);
 }
 
 export async function getCommissionChartData(ctx: DashboardContext) {

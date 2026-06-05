@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -27,8 +28,23 @@ import { CHART_COLORS } from "@/components/charts/chart-colors";
 import { useTenantStore } from "@/store/tenant";
 import type { CommissionRow } from "@/lib/commission/queries";
 import { Download, Printer, IndianRupee } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { StatGridSkeleton, TableSkeleton } from "@/components/ui/skeleton";
+import { Pagination } from "@/components/ui/pagination";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useSort } from "@/lib/hooks/use-sort";
+import type { PaginatedResult } from "@/lib/api/list-params";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const POLICY_TYPES = [
   "all",
@@ -41,23 +57,34 @@ const POLICY_TYPES = [
   "child",
 ];
 
+const PAGE_SIZE = 25;
+
 export function CommissionDashboard() {
   const isManager = useTenantStore((s) => s.isManager);
+  const searchParams = useSearchParams();
   const [month, setMonth] = useState(format(new Date(), "yyyy-MM"));
   const [fy, setFy] = useState("");
   const [commissionType, setCommissionType] = useState("all");
   const [policyType, setPolicyType] = useState("all");
-  const [agentId, setAgentId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [agentId, setAgentId] = useState(searchParams.get("agent_id") ?? "");
+  const [page, setPage] = useState(1);
+  const { sort, order, toggleSort } = useSort("created_at", "desc");
 
   const qs = useMemo(() => {
     const p = new URLSearchParams();
+    p.set("page", String(page));
+    p.set("pageSize", String(PAGE_SIZE));
+    p.set("sort", sort);
+    p.set("order", order);
     if (month) p.set("month", month);
     if (fy) p.set("fy", fy);
     if (commissionType !== "all") p.set("commission_type", commissionType);
     if (policyType !== "all") p.set("policy_type", policyType);
+    if (statusFilter !== "all") p.set("status", statusFilter);
     if (agentId) p.set("agent_id", agentId);
     return p.toString();
-  }, [month, fy, commissionType, policyType, agentId]);
+  }, [month, fy, commissionType, policyType, statusFilter, agentId, page, sort, order]);
 
   const { data: agentsData } = useQuery({
     queryKey: ["commission-agents"],
@@ -83,7 +110,7 @@ export function CommissionDashboard() {
           fyTotal: number;
           pending: number;
         };
-        commissions: CommissionRow[];
+        commissions: PaginatedResult<CommissionRow>;
         charts: {
           monthlyByAgent: Record<string, string | number>[];
           typeSplit: { name: string; value: number }[];
@@ -112,12 +139,18 @@ export function CommissionDashboard() {
     return Array.from(keys);
   }, [data?.charts.monthlyByAgent]);
 
-  const commissions = data?.commissions ?? [];
+  const commissions = data?.commissions?.items ?? [];
+  const commissionTotal = data?.commissions?.total ?? 0;
 
   return (
-    <div className="commission-print space-y-6">
+    <div className="commission-print section-gap">
       <PageHeader
-        title="Commission earnings"
+        title="Commissions"
+        description="Track gross and net commission by month, agent, and policy type."
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Commissions" },
+        ]}
         actions={
           <div className="flex gap-2 print:hidden">
             <Button variant="secondary" size="sm" onClick={exportCSV}>
@@ -139,46 +172,52 @@ export function CommissionDashboard() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3 print:hidden">
-        <input
+      <div className="filter-bar print:hidden">
+        <Input
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="h-9 rounded-btn border px-2 text-sm"
+          className="w-[160px]"
+          aria-label="Month"
         />
-        <input
+        <Input
           type="text"
           placeholder="FY e.g. 2025-26"
           value={fy}
           onChange={(e) => setFy(e.target.value)}
-          className="h-9 w-32 rounded-btn border px-2 text-sm"
+          className="w-32"
         />
-        <select
+        <Select
           value={commissionType}
           onChange={(e) => setCommissionType(e.target.value)}
-          className="h-9 rounded-btn border px-2 text-sm"
+          containerClassName="w-[140px]"
         >
           <option value="all">All types</option>
           <option value="first_year">First year</option>
           <option value="renewal">Renewal</option>
           <option value="bonus">Bonus</option>
-        </select>
-        <select
+        </Select>
+        <Select
           value={policyType}
           onChange={(e) => setPolicyType(e.target.value)}
-          className="h-9 rounded-btn border px-2 text-sm"
+          containerClassName="w-[160px]"
         >
           {POLICY_TYPES.map((t) => (
             <option key={t} value={t}>
               {t === "all" ? "All plan types" : t.replace("_", " ")}
             </option>
           ))}
-        </select>
+        </Select>
+        <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} containerClassName="w-[140px]">
+          <option value="all">All statuses</option>
+          <option value="paid">Paid</option>
+          <option value="pending">Pending</option>
+        </Select>
         {isManager && (
-          <select
+          <Select
             value={agentId}
-            onChange={(e) => setAgentId(e.target.value)}
-            className="h-9 rounded-btn border px-2 text-sm"
+            onChange={(e) => { setAgentId(e.target.value); setPage(1); }}
+            containerClassName="w-[160px]"
           >
             <option value="">All agents</option>
             {(agentsData?.agents ?? []).map((a) => (
@@ -186,7 +225,7 @@ export function CommissionDashboard() {
                 {a.full_name}
               </option>
             ))}
-          </select>
+          </Select>
         )}
       </div>
 
@@ -223,7 +262,7 @@ export function CommissionDashboard() {
           {isManager && data?.charts && (
             <div className="grid gap-6 lg:grid-cols-2 print:hidden">
               {agentKeys.length > 0 && (
-                <div className="rounded-card border bg-white p-4 shadow-card">
+                <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/\[0\.06\]">
                   <h3 className="mb-3 text-sm font-semibold">
                     Commission by agent (6 months)
                   </h3>
@@ -246,7 +285,7 @@ export function CommissionDashboard() {
                   </ResponsiveContainer>
                 </div>
               )}
-              <div className="rounded-card border bg-white p-4 shadow-card">
+              <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/\[0\.06\]">
                 <h3 className="mb-3 text-sm font-semibold">By commission type</h3>
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
@@ -270,7 +309,7 @@ export function CommissionDashboard() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="rounded-card border bg-white p-4 shadow-card lg:col-span-2">
+              <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/\[0\.06\] lg:col-span-2">
                 <h3 className="mb-3 text-sm font-semibold">12-month trend</h3>
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={data.charts.trendLine}>
@@ -292,35 +331,26 @@ export function CommissionDashboard() {
             </div>
           )}
 
-          <div className="overflow-x-auto rounded-card border bg-white shadow-card">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-lic-blue-50">
-                  {[
-                    "Month",
-                    "Customer",
-                    "Policy #",
-                    "Plan",
-                    "Type",
-                    "Premium",
-                    "Rate",
-                    "Gross",
-                    "GST",
-                    "Net",
-                    "Status",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      className="px-2 py-2 text-left text-xs uppercase text-lic-neutral-500"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
+          <TableContainer title={`${commissionTotal} commission${commissionTotal === 1 ? "" : "s"}`}>
+            <Table dense>
+              <TableHeader sticky>
+                <TableRow>
+                  <SortableTableHead label="Month" column="month" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} sticky />
+                  <TableHead hideOnMobile className="hidden md:table-cell">Customer</TableHead>
+                  <TableHead hideOnMobile className="hidden lg:table-cell">Policy #</TableHead>
+                  <TableHead hideOnMobile className="hidden lg:table-cell">Plan</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead hideOnMobile className="hidden md:table-cell" align="right">Premium</TableHead>
+                  <TableHead hideOnMobile className="hidden lg:table-cell">Rate</TableHead>
+                  <TableHead hideOnMobile className="hidden md:table-cell" align="right">Gross</TableHead>
+                  <TableHead hideOnMobile className="hidden lg:table-cell" align="right">GST</TableHead>
+                  <SortableTableHead label="Net" column="net_commission" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} align="right" />
+                  <SortableTableHead label="Status" column="status" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {commissions.length === 0 && (
-                  <tr>
+                  <TableRow>
                     <td colSpan={11} className="p-0">
                       <EmptyState
                         icon={IndianRupee}
@@ -331,38 +361,27 @@ export function CommissionDashboard() {
                         className="border-0"
                       />
                     </td>
-                  </tr>
+                  </TableRow>
                 )}
                 {commissions.map((r) => (
-                  <tr key={r.id} className="border-b">
-                    <td className="px-2 py-2">{r.month}</td>
-                    <td className="px-2 py-2">
-                      {r.policy?.customer?.full_name ?? "—"}
-                    </td>
-                    <td className="px-2 py-2">{r.policy?.policy_number ?? "—"}</td>
-                    <td className="px-2 py-2">{r.policy?.plan_name ?? "—"}</td>
-                    <td className="px-2 py-2">
-                      <Badge>{r.commission_type}</Badge>
-                    </td>
-                    <td className="px-2 py-2">{formatINR(Number(r.premium_amount))}</td>
-                    <td className="px-2 py-2">{r.commission_rate}%</td>
-                    <td className="px-2 py-2">
-                      {formatINR(Number(r.commission_amount))}
-                    </td>
-                    <td className="px-2 py-2">{formatINR(Number(r.gst_amount))}</td>
-                    <td className="px-2 py-2 font-medium">
-                      {formatINR(Number(r.net_commission))}
-                    </td>
-                    <td className="px-2 py-2">
-                      <Badge variant={r.status === "paid" ? "active" : "trial"}>
-                        {r.status}
-                      </Badge>
-                    </td>
-                  </tr>
+                  <TableRow key={r.id} interactive>
+                    <TableCell mono sticky>{r.month}</TableCell>
+                    <TableCell primary hideOnMobile className="hidden md:table-cell truncate">{r.policy?.customer?.full_name ?? "—"}</TableCell>
+                    <TableCell mono hideOnMobile className="hidden lg:table-cell">{r.policy?.policy_number ?? "—"}</TableCell>
+                    <TableCell hideOnMobile className="hidden lg:table-cell truncate">{r.policy?.plan_name ?? "—"}</TableCell>
+                    <TableCell><Badge>{r.commission_type}</Badge></TableCell>
+                    <TableCell mono align="right" hideOnMobile className="hidden md:table-cell">{formatINR(Number(r.premium_amount))}</TableCell>
+                    <TableCell hideOnMobile className="hidden lg:table-cell">{r.commission_rate}%</TableCell>
+                    <TableCell mono align="right" hideOnMobile className="hidden md:table-cell">{formatINR(Number(r.commission_amount))}</TableCell>
+                    <TableCell mono align="right" hideOnMobile className="hidden lg:table-cell">{formatINR(Number(r.gst_amount))}</TableCell>
+                    <TableCell mono align="right" primary>{formatINR(Number(r.net_commission))}</TableCell>
+                    <TableCell><Badge variant={r.status === "paid" ? "active" : "trial"}>{r.status}</Badge></TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+            <Pagination page={page} pageSize={PAGE_SIZE} total={commissionTotal} onPageChange={setPage} />
+          </TableContainer>
         </>
       )}
     </div>

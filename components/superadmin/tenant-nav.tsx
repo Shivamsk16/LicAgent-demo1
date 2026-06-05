@@ -17,16 +17,22 @@ export function TenantNav({ tenant }: { tenant: Tenant }) {
   const pathname = usePathname();
 
   return (
-    <div className="mb-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-[22px] font-semibold">{tenant.name}</h1>
-        <Badge variant={tenant.plan as "trial"}>{tenant.plan}</Badge>
-        <Badge variant={tenant.status as "active"}>{tenant.status}</Badge>
+    <div className="mb-8">
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight text-lic-neutral-900">
+          {tenant.name}
+        </h1>
+        <Badge variant={tenant.plan as "trial"} dot>
+          {tenant.plan}
+        </Badge>
+        <Badge variant={tenant.status as "active"} dot>
+          {tenant.status}
+        </Badge>
       </div>
-      <p className="mt-1 text-sm text-lic-neutral-500">
+      <p className="mt-1.5 text-sm text-lic-neutral-500">
         {tenant.branch_code} · {tenant.city}, {tenant.state}
       </p>
-      <nav className="mt-4 flex gap-1 border-b border-lic-neutral-200">
+      <nav className="mt-6 flex gap-1 border-b border-lic-neutral-200">
         {tabs.map((tab) => {
           const href = tab.href(tenant.id);
           const active =
@@ -38,13 +44,16 @@ export function TenantNav({ tenant }: { tenant: Tenant }) {
               key={href}
               href={href}
               className={cn(
-                "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+                "relative px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out",
                 active
-                  ? "border-lic-yellow-400 text-lic-neutral-800"
-                  : "border-transparent text-lic-neutral-500 hover:text-lic-neutral-800"
+                  ? "text-lic-neutral-900"
+                  : "text-lic-neutral-500 hover:text-lic-neutral-800"
               )}
             >
               {tab.label}
+              {active && (
+                <span className="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-lic-neutral-900" />
+              )}
             </Link>
           );
         })}

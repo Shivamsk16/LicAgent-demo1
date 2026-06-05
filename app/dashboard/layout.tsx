@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { getDashboardContext } from "@/lib/auth/dashboard-context";
+import { isSuperAdmin, getSessionUser } from "@/lib/auth/super-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function DashboardLayout({
@@ -10,7 +11,11 @@ export default async function DashboardLayout({
 }) {
   const { error, ctx } = await getDashboardContext();
   if (error === "UNAUTHORIZED") redirect("/login");
-  if (error === "NO_TENANT") redirect("/login?error=no_tenant");
+  if (error === "NO_TENANT") {
+    const user = await getSessionUser();
+    if (user && (await isSuperAdmin(user.id))) redirect("/superadmin");
+    redirect("/login?error=no_tenant");
+  }
   if (!ctx) redirect("/login");
 
   let userName: string | undefined;

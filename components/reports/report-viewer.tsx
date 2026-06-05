@@ -20,13 +20,26 @@ import {
 } from "recharts";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/utils/currency";
 import { CHART_COLORS } from "@/components/charts/chart-colors";
 import type { ReportId } from "@/lib/reports/types";
 import { useTenantStore } from "@/store/tenant";
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { Download, Printer } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { Alert } from "@/components/ui/alert";
+import { Pagination } from "@/components/ui/pagination";
 import { ChartSkeleton, TableSkeleton } from "@/components/ui/skeleton";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export function ReportViewer({ reportId }: { reportId: ReportId }) {
   const isManager = useTenantStore((s) => s.isManager);
@@ -38,6 +51,10 @@ export function ReportViewer({ reportId }: { reportId: ReportId }) {
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
   const [fy, setFy] = useState("");
+  const [rowSearch, setRowSearch] = useState("");
+  const [rowPage, setRowPage] = useState(1);
+  const ROW_PAGE_SIZE = 25;
+  const debouncedRowSearch = useDebouncedValue(rowSearch);
 
   const qs = useMemo(() => {
     const p = new URLSearchParams({ from, to });
@@ -45,7 +62,7 @@ export function ReportViewer({ reportId }: { reportId: ReportId }) {
     return p.toString();
   }, [from, to, fy]);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["report", reportId, qs],
     queryFn: async () => {
       const res = await fetch(`/api/reports/${reportId}?${qs}`);
@@ -57,27 +74,38 @@ export function ReportViewer({ reportId }: { reportId: ReportId }) {
 
   const meta = data?.meta;
   const chartData = data?.chartData ?? [];
-  const rows = data?.rows ?? [];
+  const allRows = (data?.rows ?? []) as Record<string, unknown>[];
+
+  const filteredRows = useMemo(() => {
+    if (!debouncedRowSearch.trim()) return allRows;
+    const q = debouncedRowSearch.toLowerCase();
+    return allRows.filter((row) =>
+      Object.values(row).some((v) => String(v ?? "").toLowerCase().includes(q))
+    );
+  }, [allRows, debouncedRowSearch]);
+
+  const rowTotal = filteredRows.length;
+  const rows = filteredRows.slice(
+    (rowPage - 1) * ROW_PAGE_SIZE,
+    rowPage * ROW_PAGE_SIZE
+  );
 
   function exportCSV() {
     window.open(`/api/reports/${reportId}/export?${qs}`, "_blank");
   }
 
   return (
-    <div className="report-print space-y-6">
-      <div className="print:hidden">
-        <Link
-          href="/dashboard/reports"
-          className="mb-2 inline-flex items-center gap-1 text-sm text-lic-neutral-500 hover:text-lic-neutral-800"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          All reports
-        </Link>
-      </div>
-
+    <div className="report-print section-gap">
       <PageHeader
         title={meta?.name ?? "Report"}
         description={meta?.description}
+        backHref="/dashboard/reports"
+        backLabel="All reports"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Reports", href: "/dashboard/reports" },
+          { label: meta?.name ?? "Report" },
+        ]}
         actions={
           <div className="flex gap-2 print:hidden">
             {canExport && (
@@ -94,34 +122,34 @@ export function ReportViewer({ reportId }: { reportId: ReportId }) {
         }
       />
 
-      <div className="flex flex-wrap gap-3 print:hidden">
-        <label className="text-xs text-lic-neutral-500">
+      <div className="filter-bar print:hidden">
+        <label className="flex items-center gap-2 text-xs text-lic-neutral-500">
           From
-          <input
+          <Input
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="ml-1 h-9 rounded-btn border px-2 text-sm"
+            className="w-[160px]"
           />
         </label>
-        <label className="text-xs text-lic-neutral-500">
+        <label className="flex items-center gap-2 text-xs text-lic-neutral-500">
           To
-          <input
+          <Input
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="ml-1 h-9 rounded-btn border px-2 text-sm"
+            className="w-[160px]"
           />
         </label>
         {reportId === "financial-year-summary" && (
-          <label className="text-xs text-lic-neutral-500">
+          <label className="flex items-center gap-2 text-xs text-lic-neutral-500">
             FY
-            <input
+            <Input
               type="text"
               placeholder="2025-26"
               value={fy}
               onChange={(e) => setFy(e.target.value)}
-              className="ml-1 h-9 w-28 rounded-btn border px-2 text-sm"
+              className="w-28"
             />
           </label>
         )}
@@ -133,8 +161,17 @@ export function ReportViewer({ reportId }: { reportId: ReportId }) {
           <TableSkeleton rows={6} cols={4} />
         </>
       )}
-      {error && (
-        <p className="text-sm text-lic-red-600">{(error as Error).message}</p>
+      {isError && (
+        <Alert variant="error" title="Could not load report">
+          {error instanceof Error ? error.message : "Something went wrong."}
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="mt-2 text-xs font-medium underline"
+          >
+            Try again
+          </button>
+        </Alert>
       )}
 
       {data && (
@@ -150,12 +187,12 @@ export function ReportViewer({ reportId }: { reportId: ReportId }) {
               {Object.entries(data.summary).map(([k, v]) => (
                 <div
                   key={k}
-                  className="rounded-card border bg-white p-4 shadow-card"
+                  className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06]"
                 >
-                  <p className="text-xs uppercase text-lic-neutral-500">
+                  <p className="text-[13px] text-lic-neutral-500">
                     {k.replace(/([A-Z])/g, " $1")}
                   </p>
-                  <p className="mt-1 text-lg font-semibold">
+                  <p className="mt-1 text-lg font-semibold text-lic-neutral-900">
                     {typeof v === "number" && k.toLowerCase().includes("commission")
                       ? formatINR(v)
                       : typeof v === "number" && k.toLowerCase().includes("premium")
@@ -167,37 +204,50 @@ export function ReportViewer({ reportId }: { reportId: ReportId }) {
             </div>
           )}
 
-          {rows.length > 0 && (
-            <div className="overflow-x-auto rounded-card border bg-white shadow-card">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-lic-blue-50">
-                    {Object.keys(rows[0] as object).map((h) => (
-                      <th
-                        key={h}
-                        className="px-2 py-2 text-left text-xs uppercase text-lic-neutral-500"
-                      >
-                        {h}
-                      </th>
+          {allRows.length > 0 && (
+            <TableContainer
+              title={`${rowTotal} row${rowTotal === 1 ? "" : "s"}`}
+              actions={
+                <Input
+                  placeholder="Search rows…"
+                  value={rowSearch}
+                  onChange={(e) => { setRowSearch(e.target.value); setRowPage(1); }}
+                  className="h-8 w-48 text-xs"
+                />
+              }
+            >
+              <Table dense>
+                <TableHeader sticky>
+                  <TableRow>
+                    {Object.keys(allRows[0] as object).map((h, i) => (
+                      <TableHead key={h} sticky={i === 0}>{h}</TableHead>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(rows as Record<string, unknown>[]).map((row, i) => (
-                    <tr key={i} className="border-b">
-                      {Object.values(row).map((val, j) => (
-                        <td key={j} className="px-2 py-2">
-                          {typeof val === "number" &&
-                          String(Object.keys(row)[j]).toLowerCase().includes("amount")
-                            ? formatINR(val)
-                            : String(val ?? "—")}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow>
+                      <td colSpan={Object.keys(allRows[0] as object).length} className="px-4 py-8 text-center text-sm text-lic-neutral-500">
+                        No rows match your search.
+                      </td>
+                    </TableRow>
+                  ) : (
+                    rows.map((row, i) => (
+                      <TableRow key={i} interactive>
+                        {Object.entries(row).map(([key, val], j) => (
+                          <TableCell key={key} sticky={j === 0} truncate={j === 0}>
+                            {typeof val === "number" && key.toLowerCase().includes("amount")
+                              ? formatINR(val)
+                              : String(val ?? "—")}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+              <Pagination page={rowPage} pageSize={ROW_PAGE_SIZE} total={rowTotal} onPageChange={setRowPage} />
+            </TableContainer>
           )}
         </>
       )}
@@ -220,7 +270,7 @@ function ReportChart({
 
   if (chartType === "donut") {
     return (
-      <div className="rounded-card border bg-white p-4 shadow-card print:break-inside-avoid">
+      <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06] print:break-inside-avoid">
         <ResponsiveContainer width="100%" height={280}>
           <PieChart>
             <Pie
@@ -249,7 +299,7 @@ function ReportChart({
 
   if (chartType === "line" || reportId === "collection-efficiency") {
     return (
-      <div className="rounded-card border bg-white p-4 shadow-card">
+      <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06]">
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DE" />
@@ -278,7 +328,7 @@ function ReportChart({
 
   if (chartType === "horizontalBar" || reportId === "agent-performance") {
     return (
-      <div className="rounded-card border bg-white p-4 shadow-card">
+      <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06]">
         <ResponsiveContainer width="100%" height={Math.max(280, chartData.length * 36)}>
           <BarChart data={chartData} layout="vertical" margin={{ left: 80 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DE" />
@@ -294,7 +344,7 @@ function ReportChart({
 
   if (reportId === "commission-summary") {
     return (
-      <div className="rounded-card border bg-white p-4 shadow-card">
+      <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06]">
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DE" />
@@ -312,7 +362,7 @@ function ReportChart({
 
   if (chartType === "summary" || reportId === "financial-year-summary") {
     return (
-      <div className="rounded-card border bg-white p-4 shadow-card">
+      <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06]">
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DE" />
@@ -327,7 +377,7 @@ function ReportChart({
   }
 
   return (
-    <div className="rounded-card border bg-white p-4 shadow-card">
+    <div className="rounded-xl bg-lic-neutral-0 p-5 ring-1 ring-black/[0.06]">
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#E8E6DE" />

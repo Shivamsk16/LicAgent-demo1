@@ -2,10 +2,20 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
 import { formatDateTimeIST } from "@/lib/utils/dates";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ClipboardList } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ClipboardList, Search } from "lucide-react";
 
 export function AuditLogTable({ tenantId }: { tenantId?: string }) {
   const [action, setAction] = useState("");
@@ -26,29 +36,32 @@ export function AuditLogTable({ tenantId }: { tenantId?: string }) {
 
   return (
     <div className="space-y-4">
-      <input
-        placeholder="Filter by action…"
-        value={action}
-        onChange={(e) => setAction(e.target.value)}
-        className="h-9 max-w-xs rounded-btn border border-lic-neutral-200 px-3 text-sm"
-      />
+      <div className="filter-bar">
+        <div className="relative min-w-[200px] max-w-xs flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lic-neutral-400" strokeWidth={1.75} />
+          <Input
+            placeholder="Filter by action…"
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
       {isLoading ? (
         <TableSkeleton rows={10} cols={5} />
       ) : logs.length === 0 ? (
         <EmptyState icon={ClipboardList} title="No audit logs" description="No matching entries." />
       ) : (
-        <div className="overflow-x-auto rounded-card border bg-white shadow-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-lic-blue-50">
+        <TableContainer>
+          <Table>
+            <TableHeader>
+              <TableRow>
                 {["Time", "Actor", "Action", "Resource", "Details"].map((h) => (
-                  <th key={h} className="px-3 py-2 text-xs font-semibold uppercase text-lic-neutral-500">
-                    {h}
-                  </th>
+                  <TableHead key={h}>{h}</TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {logs.map((log: {
                 id: string;
                 created_at: string;
@@ -58,14 +71,14 @@ export function AuditLogTable({ tenantId }: { tenantId?: string }) {
                 after_state: unknown;
                 actor?: { full_name: string };
               }) => (
-                <tr key={log.id} className="border-b align-top">
-                  <td className="px-3 py-2 whitespace-nowrap">
+                <TableRow key={log.id} className="align-top">
+                  <TableCell className="whitespace-nowrap">
                     {formatDateTimeIST(log.created_at)}
-                  </td>
-                  <td className="px-3 py-2">{log.actor?.full_name ?? "System"}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{log.action}</td>
-                  <td className="px-3 py-2">{log.resource_type ?? "—"}</td>
-                  <td className="px-3 py-2">
+                  </TableCell>
+                  <TableCell>{log.actor?.full_name ?? "System"}</TableCell>
+                  <TableCell mono>{log.action}</TableCell>
+                  <TableCell>{log.resource_type ?? "—"}</TableCell>
+                  <TableCell>
                     <details>
                       <summary className="cursor-pointer text-lic-blue-400">View diff</summary>
                       <pre className="mt-1 max-w-md overflow-auto rounded bg-lic-neutral-50 p-2 text-xs">
@@ -76,12 +89,12 @@ export function AuditLogTable({ tenantId }: { tenantId?: string }) {
                         )}
                       </pre>
                     </details>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
     </div>
   );
