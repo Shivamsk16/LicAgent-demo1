@@ -2,26 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    @apply bg-lic-neutral-50 text-lic-neutral-800 text-sm leading-relaxed antialiased;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer utilities {
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+/* Mobile: improve table scroll and safe areas */
+@media (max-width: 640px) {
+  main {
+    @apply p-4;
+  }
+}
+
+@media print {
+  aside,
+  header,
+  .print\\:hidden {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .commission-print,
+  .report-print {
+    padding: 0;
   }
 }
