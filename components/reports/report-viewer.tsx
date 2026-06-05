@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import {
   Bar,
   BarChart,
@@ -74,7 +73,10 @@ export function ReportViewer({ reportId }: { reportId: ReportId }) {
 
   const meta = data?.meta;
   const chartData = data?.chartData ?? [];
-  const allRows = (data?.rows ?? []) as Record<string, unknown>[];
+  const allRows = useMemo(
+    () => (data?.rows ?? []) as Record<string, unknown>[],
+    [data?.rows]
+  );
 
   const filteredRows = useMemo(() => {
     if (!debouncedRowSearch.trim()) return allRows;

@@ -7,7 +7,6 @@ import {
   FileText,
   Filter,
   Search,
-  UserPlus,
   Users,
   Wallet,
 } from "lucide-react";

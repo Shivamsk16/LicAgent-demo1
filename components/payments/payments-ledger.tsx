@@ -28,7 +28,7 @@ import { toast } from "@/lib/toast";
 import type { PaginatedResult } from "@/lib/api/list-params";
 import { formatINR } from "@/lib/utils/currency";
 import { formatDateIST } from "@/lib/utils/dates";
-import { Plus, Search, Wallet } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import type { Payment } from "@/types/business";
 
 const STATUS_OPTIONS = [

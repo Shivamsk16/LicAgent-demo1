@@ -28,7 +28,7 @@ import { toast } from "@/lib/toast";
 import type { PaginatedResult } from "@/lib/api/list-params";
 import { formatINR } from "@/lib/utils/currency";
 import { formatDateIST } from "@/lib/utils/dates";
-import { FileText, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import type { Policy } from "@/types/business";
 import { useTenantStore } from "@/store/tenant";
 

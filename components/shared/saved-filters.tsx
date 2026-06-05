@@ -91,6 +91,7 @@ export function SavedFilters({
                     <button
                       type="button"
                       role="option"
+                      aria-selected={false}
                       className="flex-1 rounded-lg px-3 py-2 text-left text-[13px] text-lic-neutral-700 hover:bg-black/[0.04]"
                       onClick={() => {
                         onApply(f.values);

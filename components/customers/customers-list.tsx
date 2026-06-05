@@ -32,7 +32,7 @@ import { useSort } from "@/lib/hooks/use-sort";
 import { downloadCSV, rowsToCSV } from "@/lib/utils/csv";
 import { toast } from "@/lib/toast";
 import type { PaginatedResult } from "@/lib/api/list-params";
-import { Plus, Search, Users, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { useTenantStore } from "@/store/tenant";
 import type { Customer } from "@/types/business";
 

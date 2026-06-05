@@ -46,7 +46,7 @@ export function useFilterUrlSync(
   filters: FilterValues,
   options?: { preserve?: string[] }
 ) {
-  const preserve = options?.preserve ?? [];
+  const preserveKey = options?.preserve?.join(",") ?? "";
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -59,6 +59,7 @@ export function useFilterUrlSync(
       return;
     }
 
+    const preserve = preserveKey ? preserveKey.split(",") : [];
     const parsed = JSON.parse(serialized) as FilterValues;
     const filterKeys = Object.keys(parsed);
     const nextQs = desiredQuery(parsed, preserve, searchParams);
@@ -67,5 +68,5 @@ export function useFilterUrlSync(
     if (nextQs === curQs) return;
 
     router.replace(nextQs ? `${pathname}?${nextQs}` : pathname, { scroll: false });
-  }, [serialized, pathname, preserve.join(","), router, searchParams]);
+  }, [serialized, pathname, preserveKey, router, searchParams]);
 }

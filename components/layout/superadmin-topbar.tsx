@@ -22,14 +22,3 @@ export function SuperAdminTopbarActions() {
     </Button>
   );
 }
-
-/** @deprecated Use SuperAdminTopbarActions inside AppTopbar */
-export function SuperAdminTopbar({
-  userName,
-  onMenuClick,
-}: {
-  userName?: string;
-  onMenuClick?: () => void;
-}) {
-  return null;
-}
