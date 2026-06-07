@@ -5,6 +5,10 @@ import {
   getActiveMemberships,
   membershipRole,
 } from "@/lib/auth/memberships";
+import {
+  denialToContextError,
+  getTenantAccessDenial,
+} from "@/lib/auth/tenant-access";
 import type { Tenant } from "@/types/database";
 
 export type DashboardRole =
@@ -12,6 +16,13 @@ export type DashboardRole =
   | "senior_agent"
   | "agent"
   | "viewer";
+
+export type DashboardContextError =
+  | "UNAUTHORIZED"
+  | "NO_TENANT"
+  | "FORBIDDEN"
+  | "TRIAL_EXPIRED"
+  | "ACCOUNT_SUSPENDED";
 
 export interface DashboardContext {
   userId: string;
@@ -23,7 +34,7 @@ export interface DashboardContext {
 }
 
 export async function getDashboardContext(): Promise<
-  | { error: "UNAUTHORIZED" | "NO_TENANT" | "FORBIDDEN"; ctx: null }
+  | { error: DashboardContextError; ctx: null }
   | { error: null; ctx: DashboardContext }
 > {
   const supabase = await createClient();
@@ -38,24 +49,9 @@ export async function getDashboardContext(): Promise<
 
   const admin = createAdminClient();
 
-  const { data: profile } = await admin
-    .from("users")
-    .select("super_admin")
-    .eq("id", user.id)
-    .single();
-
   const memberships = await getActiveMemberships(user.id);
 
   if (!memberships.length) {
-    if (profile?.super_admin) {
-      console.log("[auth-debug]", JSON.stringify({
-        event: "dashboard_context_super_admin_no_tenant",
-        userId: user.id,
-        role: "super_admin",
-        tenantId: null,
-        redirectTo: "FORBIDDEN",
-      }));
-    }
     return { error: "NO_TENANT", ctx: null };
   }
 
@@ -74,26 +70,10 @@ export async function getDashboardContext(): Promise<
     .eq("id", resolvedTenantId)
     .single();
 
-  if (!tenant || tenant.status !== "active") {
-    return { error: "FORBIDDEN", ctx: null };
+  const denial = getTenantAccessDenial(tenant as Tenant | null);
+  if (denial) {
+    return { error: denialToContextError(denial), ctx: null };
   }
-
-  if (
-    tenant.plan === "trial" &&
-    tenant.trial_ends_at &&
-    new Date(tenant.trial_ends_at) < new Date()
-  ) {
-    return { error: "FORBIDDEN", ctx: null };
-  }
-
-  console.log("[auth-debug]", JSON.stringify({
-    event: "dashboard_context_resolved",
-    userId: user.id,
-    role,
-    tenantId: resolvedTenantId,
-    resolvedTenant: tenant.name,
-    redirectTo: "next",
-  }));
 
   return {
     error: null,

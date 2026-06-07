@@ -6,6 +6,8 @@ export async function GET() {
   const { error, ctx } = await getDashboardContext();
   if (error === "UNAUTHORIZED") return apiError("UNAUTHORIZED", "Not signed in", 401);
   if (error === "NO_TENANT") return apiError("FORBIDDEN", "No active branch", 403);
+  if (error === "TRIAL_EXPIRED") return apiError("FORBIDDEN", "Trial expired", 403);
+  if (error === "ACCOUNT_SUSPENDED") return apiError("FORBIDDEN", "Branch suspended", 403);
   if (error === "FORBIDDEN" || !ctx) return apiError("FORBIDDEN", "Access denied", 403);
 
   try {

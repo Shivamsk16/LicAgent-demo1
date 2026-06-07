@@ -9,11 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Form, FormField } from "@/components/ui/form";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
+import { sanitizeRedirectPath } from "@/lib/auth/safe-redirect";
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dashboard";
+  const redirect = sanitizeRedirectPath(searchParams.get("redirect"));
   const queryError = searchParams.get("error");
   const resetSuccess = searchParams.get("reset") === "success";
   const [email, setEmail] = useState("");

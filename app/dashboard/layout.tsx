@@ -16,7 +16,9 @@ export default async function DashboardLayout({
     if (user && (await isSuperAdmin(user.id))) redirect("/superadmin");
     redirect("/login?error=no_tenant");
   }
-  if (!ctx) redirect("/login");
+  if (error === "TRIAL_EXPIRED") redirect("/trial-expired");
+  if (error === "ACCOUNT_SUSPENDED") redirect("/account-suspended");
+  if (error === "FORBIDDEN" || !ctx) redirect("/account-suspended");
 
   let userName: string | undefined;
   try {
@@ -28,7 +30,7 @@ export default async function DashboardLayout({
       .single();
     userName = data?.full_name;
   } catch {
-    /* */
+    /* profile optional */
   }
 
   return (

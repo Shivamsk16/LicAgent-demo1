@@ -6,6 +6,7 @@ import { logAction } from "@/lib/audit";
 import { generateReminders } from "@/lib/business/reminders";
 import { apiError, apiSuccess } from "@/lib/api/response";
 import { applySort, paginated, parseListParams } from "@/lib/api/list-params";
+import { fetchCustomerInTenant } from "@/lib/auth/policy-access";
 
 const SORT_COLUMNS = {
   policy_number: "policy_number",
@@ -78,6 +79,17 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+
+  const customer = await fetchCustomerInTenant(
+    admin,
+    parsed.data.customer_id,
+    ctx.tenantId,
+    !ctx.isManager ? { requireAssignedAgentId: ctx.userId } : undefined
+  );
+  if (!customer) {
+    return apiError("NOT_FOUND", "Customer not found", 404);
+  }
+
   const maturity =
     parsed.data.maturity_date ??
     addYears(

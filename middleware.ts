@@ -5,6 +5,10 @@ import {
   membershipRole,
 } from "@/lib/auth/memberships";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPublicApiRoute, shouldApiReturnUnauthorized } from "@/lib/auth/public-api";
+import { apiUnauthorizedResponse } from "@/lib/api/unauthorized";
+import { denialToPath, getTenantAccessDenial } from "@/lib/auth/tenant-access";
+import type { Tenant } from "@/types/database";
 
 const PUBLIC_ROUTES = [
   "/",
@@ -13,11 +17,11 @@ const PUBLIC_ROUTES = [
   "/reset-password",
   "/select-tenant",
   "/auth/callback",
+  "/trial-expired",
+  "/account-suspended",
 ];
 
-function authDebug(payload: Record<string, unknown>) {
-  console.log("[auth-debug]", JSON.stringify(payload));
-}
+const ACCOUNT_STATUS_ROUTES = ["/trial-expired", "/account-suspended"];
 
 async function isSuperAdmin(userId: string): Promise<boolean> {
   try {
@@ -33,6 +37,22 @@ async function isSuperAdmin(userId: string): Promise<boolean> {
   }
 }
 
+async function getTenantDenialForMembership(
+  tenantId: string
+): Promise<ReturnType<typeof getTenantAccessDenial>> {
+  try {
+    const admin = createAdminClient();
+    const { data: tenant } = await admin
+      .from("tenants")
+      .select("status, plan, trial_ends_at")
+      .eq("id", tenantId)
+      .single();
+    return getTenantAccessDenial(tenant as Tenant | null);
+  } catch {
+    return "inactive";
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic =
@@ -42,13 +62,29 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (isPublicApiRoute(pathname)) {
+    return NextResponse.next();
+  }
+
   const { user, supabaseResponse } = await updateSession(request);
+
+  if (shouldApiReturnUnauthorized(pathname, !!user)) {
+    return apiUnauthorizedResponse();
+  }
+
+  if (ACCOUNT_STATUS_ROUTES.includes(pathname)) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      return NextResponse.redirect(url);
+    }
+    return supabaseResponse;
+  }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);
-    authDebug({ event: "unauthenticated", pathname, redirectTo: url.toString() });
     return NextResponse.redirect(url);
   }
 
@@ -57,11 +93,6 @@ export async function middleware(request: NextRequest) {
     if (!superAdmin) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
-      authDebug({
-        event: "superadmin_forbidden",
-        userId: user.id,
-        redirectTo: url.pathname,
-      });
       return NextResponse.redirect(url);
     }
   }
@@ -69,38 +100,20 @@ export async function middleware(request: NextRequest) {
   if (user && pathname.startsWith("/dashboard")) {
     const superAdmin = await isSuperAdmin(user.id);
     if (superAdmin) {
-      authDebug({
-        event: "dashboard_super_admin_bypass",
-        userId: user.id,
-        role: "super_admin",
-        tenantId: null,
-        redirectTo: "next",
-      });
       return supabaseResponse;
     }
 
     let memberships: Awaited<ReturnType<typeof getActiveMemberships>> = [];
     try {
       memberships = await getActiveMemberships(user.id);
-    } catch (err) {
-      authDebug({
-        event: "membership_lookup_failed",
-        userId: user.id,
-        error: err instanceof Error ? err.message : "unknown",
-      });
+    } catch {
+      /* membership lookup failed */
     }
 
     if (!memberships.length) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("error", "no_tenant");
-      authDebug({
-        event: "no_tenant",
-        userId: user.id,
-        tenantId: request.cookies.get("active_tenant")?.value ?? null,
-        membershipCount: 0,
-        redirectTo: url.toString(),
-      });
       return NextResponse.redirect(url);
     }
 
@@ -108,17 +121,15 @@ export async function middleware(request: NextRequest) {
       request.cookies.get("active_tenant")?.value ?? memberships[0].tenant_id;
     const membership =
       memberships.find((m) => m.tenant_id === activeTenant) ?? memberships[0];
+
+    const denial = await getTenantDenialForMembership(membership.tenant_id);
+    if (denial) {
+      const url = request.nextUrl.clone();
+      url.pathname = denialToPath(denial);
+      return NextResponse.redirect(url);
+    }
+
     const role = membershipRole(membership);
-
-    authDebug({
-      event: "dashboard_allowed",
-      userId: user.id,
-      role,
-      tenantId: membership.tenant_id,
-      resolvedTenant: membership.tenant_id,
-      redirectTo: "next",
-    });
-
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-tenant-id", membership.tenant_id);
     requestHeaders.set("x-user-role", role);
@@ -140,13 +151,7 @@ export async function middleware(request: NextRequest) {
   if (user && (pathname === "/login" || pathname === "/")) {
     const errorParam = request.nextUrl.searchParams.get("error");
 
-    // Break redirect loop: do not send no_tenant users back to /dashboard.
     if (errorParam === "no_tenant") {
-      authDebug({
-        event: "login_stay_no_tenant",
-        userId: user.id,
-        redirectTo: "stay",
-      });
       return supabaseResponse;
     }
 
@@ -155,45 +160,34 @@ export async function middleware(request: NextRequest) {
 
     if (superAdmin) {
       url.pathname = "/superadmin";
-      authDebug({
-        event: "login_redirect_superadmin",
-        userId: user.id,
-        role: "super_admin",
-        redirectTo: url.pathname,
-      });
       return NextResponse.redirect(url);
     }
 
     let memberships: Awaited<ReturnType<typeof getActiveMemberships>> = [];
     try {
       memberships = await getActiveMemberships(user.id);
-    } catch (err) {
-      authDebug({
-        event: "membership_lookup_failed",
-        userId: user.id,
-        error: err instanceof Error ? err.message : "unknown",
-      });
+    } catch {
+      /* membership lookup failed */
     }
 
     if (!memberships.length) {
       if (pathname === "/") {
         url.pathname = "/login";
         url.searchParams.set("error", "no_tenant");
-        authDebug({
-          event: "root_no_tenant",
-          userId: user.id,
-          membershipCount: 0,
-          redirectTo: url.toString(),
-        });
         return NextResponse.redirect(url);
       }
-      authDebug({
-        event: "login_no_tenant_stay",
-        userId: user.id,
-        membershipCount: 0,
-        redirectTo: "stay",
-      });
       return supabaseResponse;
+    }
+
+    const activeTenant =
+      request.cookies.get("active_tenant")?.value ?? memberships[0].tenant_id;
+    const membership =
+      memberships.find((m) => m.tenant_id === activeTenant) ?? memberships[0];
+
+    const denial = await getTenantDenialForMembership(membership.tenant_id);
+    if (denial) {
+      url.pathname = denialToPath(denial);
+      return NextResponse.redirect(url);
     }
 
     if (memberships.length > 1) {
@@ -201,14 +195,6 @@ export async function middleware(request: NextRequest) {
     } else {
       url.pathname = "/dashboard";
     }
-    authDebug({
-      event: "login_redirect_dashboard",
-      userId: user.id,
-      role: membershipRole(memberships[0]),
-      tenantId: memberships[0].tenant_id,
-      membershipCount: memberships.length,
-      redirectTo: url.pathname,
-    });
     return NextResponse.redirect(url);
   }
 

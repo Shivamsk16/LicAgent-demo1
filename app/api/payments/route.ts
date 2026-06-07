@@ -9,6 +9,7 @@ import {
   parseListParams,
   type FilterableQuery,
 } from "@/lib/api/list-params";
+import { fetchPolicyForContext } from "@/lib/auth/policy-access";
 
 const SORT_COLUMNS = {
   payment_date: "payment_date",
@@ -107,6 +108,16 @@ export async function POST(request: Request) {
       parsed.error.issues[0]?.message ?? "Invalid",
       400
     );
+  }
+
+  const admin = createAdminClient();
+  const policy = await fetchPolicyForContext(
+    admin,
+    parsed.data.policy_id,
+    ctx
+  );
+  if (!policy) {
+    return apiError("NOT_FOUND", "Policy not found", 404);
   }
 
   const result = await recordPayment({

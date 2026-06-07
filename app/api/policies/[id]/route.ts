@@ -3,6 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { policySchema } from "@/lib/utils/validators";
 import { logAction } from "@/lib/audit";
 import { apiError, apiSuccess } from "@/lib/api/response";
+import {
+  fetchCustomerInTenant,
+  fetchPolicyForContext,
+} from "@/lib/auth/policy-access";
 
 export async function GET(
   _request: Request,
@@ -42,6 +46,21 @@ export async function PUT(
   if (!parsed.success) return apiError("VALIDATION_ERROR", "Invalid", 400);
 
   const admin = createAdminClient();
+  const existing = await fetchPolicyForContext(admin, params.id, ctx);
+  if (!existing) return apiError("NOT_FOUND", "Policy not found", 404);
+
+  if (parsed.data.customer_id) {
+    const customer = await fetchCustomerInTenant(
+      admin,
+      parsed.data.customer_id,
+      ctx.tenantId,
+      !ctx.isManager ? { requireAssignedAgentId: ctx.userId } : undefined
+    );
+    if (!customer) {
+      return apiError("NOT_FOUND", "Customer not found", 404);
+    }
+  }
+
   const { data, error: dbError } = await admin
     .from("policies")
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
