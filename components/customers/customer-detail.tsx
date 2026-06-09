@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { PolicyWizardModal } from "@/components/policies/policy-wizard-modal";
 import { PageHeader } from "@/components/shared/page-header";
 import { formatDateIST } from "@/lib/utils/dates";
 import { formatINR } from "@/lib/utils/currency";
@@ -25,7 +27,9 @@ import {
 const tabs = ["Personal", "KYC", "Policies", "Payments"] as const;
 
 export function CustomerDetail({ customerId }: { customerId: string }) {
+  const router = useRouter();
   const [tab, setTab] = useState<(typeof tabs)[number]>("Personal");
+  const [policyDrawerOpen, setPolicyDrawerOpen] = useState(false);
 
   const { data: customer, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["customer", customerId],
@@ -111,14 +115,21 @@ export function CustomerDetail({ customerId }: { customerId: string }) {
         ]}
         actions={
           <>
-            <Link href={`/dashboard/customers/${customerId}/edit`}>
-              <Button variant="secondary">Edit</Button>
+            <Link
+              href={`/dashboard/customers/${customerId}/edit`}
+              className={buttonVariants({ variant: "secondary", size: "md" })}
+            >
+              Edit
             </Link>
-            <Link href={`/dashboard/policies/new?customer=${customerId}`}>
-              <Button>Add policy</Button>
-            </Link>
+            <Button onClick={() => setPolicyDrawerOpen(true)}>Add policy</Button>
           </>
         }
+      />
+
+      <PolicyWizardModal
+        open={policyDrawerOpen}
+        onOpenChange={setPolicyDrawerOpen}
+        prefillCustomerId={customerId}
       />
 
       <div className="flex flex-wrap items-center gap-4">
@@ -180,14 +191,24 @@ export function CustomerDetail({ customerId }: { customerId: string }) {
             </TableHeader>
             <TableBody>
               {policies.map((p) => (
-                <TableRow key={p.id} interactive>
+                <TableRow
+                  key={p.id}
+                  interactive
+                  onNavigate={() => router.push(`/dashboard/policies/${p.id}`)}
+                  navigateLabel={`View policy ${p.policy_number}`}
+                >
                   <TableCell mono>{p.policy_number}</TableCell>
                   <TableCell className="font-medium text-lic-neutral-900">{p.plan_name}</TableCell>
                   <TableCell>{formatINR(Number(p.premium_amount))}</TableCell>
                   <TableCell>{p.next_premium_due ? formatDateIST(p.next_premium_due) : "—"}</TableCell>
                   <TableCell><Badge>{p.status}</Badge></TableCell>
-                  <TableCell align="right">
-                    <Link href={`/dashboard/policies/${p.id}`}><Button variant="ghost" size="sm">View</Button></Link>
+                  <TableCell align="right" data-row-action>
+                    <Link
+                      href={`/dashboard/policies/${p.id}`}
+                      className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    >
+                      View
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

@@ -77,10 +77,8 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (e.key === "n" && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
-        if (!pathname.includes("/customers/new")) {
-          e.preventDefault();
-          router.push("/dashboard/customers/new");
-        }
+        e.preventDefault();
+        router.push("/dashboard/customers?new=1");
         return;
       }
 

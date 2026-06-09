@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTableBulkBar } from "@/components/shared/data-table-bulk-bar";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { PolicyWizardModal } from "@/components/policies/policy-wizard-modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,7 @@ const STATUS_OPTIONS = [
 const PAGE_SIZE = 25;
 
 export function PoliciesList() {
+  const router = useRouter();
   const qc = useQueryClient();
   const isManager = useTenantStore((s) => s.isManager);
   const searchParams = useSearchParams();
@@ -53,8 +55,23 @@ export function PoliciesList() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
+  const [policyModalOpen, setPolicyModalOpen] = useState(
+    () => searchParams.get("new") === "1"
+  );
   const { sort, order, toggleSort } = useSort("created_at", "desc");
   const debouncedSearch = useDebouncedValue(search);
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setPolicyModalOpen(true);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("new");
+      const qs = params.toString();
+      router.replace(qs ? `/dashboard/policies?${qs}` : "/dashboard/policies", {
+        scroll: false,
+      });
+    }
+  }, [searchParams, router]);
 
   useFilterUrlSync({
     q: debouncedSearch || undefined,
@@ -135,10 +152,14 @@ export function PoliciesList() {
         description="Track policy lifecycle, premiums, and due dates."
         breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Policies" }]}
         actions={
-          <Link href="/dashboard/policies/new">
-            <Button><Plus className="h-4 w-4" strokeWidth={1.75} /> Add policy</Button>
-          </Link>
+          <Button onClick={() => setPolicyModalOpen(true)}>
+            <Plus className="h-4 w-4" strokeWidth={1.75} /> Add policy
+          </Button>
         }
+      />
+      <PolicyWizardModal
+        open={policyModalOpen}
+        onOpenChange={setPolicyModalOpen}
       />
       <div className="filter-toolbar">
         <div className="relative min-w-0 flex-1 max-w-sm">
@@ -185,7 +206,9 @@ export function PoliciesList() {
       {isError ? (
         <Alert variant="error" title="Could not load policies">
           {error instanceof Error ? error.message : "Something went wrong."}
-          <button type="button" onClick={() => refetch()} className="mt-2 text-xs font-medium underline">Try again</button>
+          <Button type="button" variant="link" size="sm" onClick={() => refetch()} className="mt-2 h-auto px-0">
+            Try again
+          </Button>
         </Alert>
       ) : isLoading ? (
         <TableSkeleton rows={10} cols={8} />
@@ -193,6 +216,7 @@ export function PoliciesList() {
         <SmartEmptyState
           entity="policies"
           hasFilters={!!debouncedSearch || status !== "all"}
+          onAction={() => setPolicyModalOpen(true)}
           onClearFilters={() => { setSearch(""); setStatus("all"); setPage(1); }}
         />
       ) : (
@@ -212,7 +236,13 @@ export function PoliciesList() {
             </TableHeader>
             <TableBody>
               {policies.map((p) => (
-                <TableRow key={p.id} interactive selected={selected.has(p.id)}>
+                <TableRow
+                  key={p.id}
+                  interactive
+                  selected={selected.has(p.id)}
+                  onNavigate={() => router.push(`/dashboard/policies/${p.id}`)}
+                  navigateLabel={`View policy ${p.policy_number}`}
+                >
                   <TableCell><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} /></TableCell>
                   <TableCell primary mono sticky truncate>{p.policy_number}</TableCell>
                   <TableCell hideOnMobile className="hidden md:table-cell truncate">{p.customer?.full_name}</TableCell>
@@ -220,8 +250,13 @@ export function PoliciesList() {
                   <TableCell mono align="right" hideOnMobile>{formatINR(Number(p.premium_amount))}</TableCell>
                   <TableCell mono hideOnMobile className="hidden lg:table-cell">{p.next_premium_due ? formatDateIST(p.next_premium_due) : "—"}</TableCell>
                   <TableCell><Badge dot>{p.status}</Badge></TableCell>
-                  <TableCell align="right">
-                    <Link href={`/dashboard/policies/${p.id}`}><Button variant="ghost" size="sm">View</Button></Link>
+                  <TableCell align="right" data-row-action>
+                    <Link
+                      href={`/dashboard/policies/${p.id}`}
+                      className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    >
+                      View
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

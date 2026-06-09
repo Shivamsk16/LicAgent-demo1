@@ -33,7 +33,7 @@ export function SetupChecklist({
     {
       id: "customer",
       label: "Add your first customer",
-      href: "/dashboard/customers/new",
+      href: "/dashboard/customers?new=1",
       done: customerCount > 0,
     },
     {

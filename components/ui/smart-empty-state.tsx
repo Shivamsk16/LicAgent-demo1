@@ -27,7 +27,7 @@ const ENTITY_CONFIG: Record<
       title: "No customers yet",
       description: "Add your first customer to start managing policies and premiums.",
       actionLabel: "Add customer",
-      actionHref: "/dashboard/customers/new",
+      actionHref: "/dashboard/customers?new=1",
     },
     filtered: {
       title: "No customers match",
@@ -40,7 +40,7 @@ const ENTITY_CONFIG: Record<
       title: "No policies found",
       description: "Create a policy for an existing customer to track premiums and lifecycle.",
       actionLabel: "Add policy",
-      actionHref: "/dashboard/policies/new",
+      actionHref: "/dashboard/policies?new=1",
     },
     filtered: {
       title: "No policies match",

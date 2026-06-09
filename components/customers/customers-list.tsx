@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTableBulkBar } from "@/components/shared/data-table-bulk-bar";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { CustomerWizardModal } from "@/components/customers/customer-wizard-modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -64,11 +65,26 @@ export function CustomersList() {
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [kyc, setKyc] = useState(() => searchParams.get("kyc") ?? "all");
   const [page, setPage] = useState(1);
+  const [customerModalOpen, setCustomerModalOpen] = useState(
+    () => searchParams.get("new") === "1"
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [assignAgent, setAssignAgent] = useState("");
   const [bulkKyc, setBulkKyc] = useState("");
   const { sort, order, toggleSort } = useSort("created_at", "desc");
   const debouncedSearch = useDebouncedValue(search);
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setCustomerModalOpen(true);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("new");
+      const qs = params.toString();
+      router.replace(qs ? `/dashboard/customers?${qs}` : "/dashboard/customers", {
+        scroll: false,
+      });
+    }
+  }, [searchParams, router]);
 
   useFilterUrlSync(
     {
@@ -190,21 +206,34 @@ export function CustomersList() {
         description="Manage customer profiles, KYC status, and policy assignments."
         breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Customers" }]}
         actions={
-          <Link href="/dashboard/customers/new">
-            <Button>
-              <Plus className="h-4 w-4" strokeWidth={1.75} />
-              Add customer
-            </Button>
-          </Link>
+          <Button onClick={() => setCustomerModalOpen(true)}>
+            <Plus className="h-4 w-4" strokeWidth={1.75} />
+            Add customer
+          </Button>
         }
+      />
+
+      <CustomerWizardModal
+        open={customerModalOpen}
+        onOpenChange={setCustomerModalOpen}
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ["customers"] });
+          toast.success("Customer created");
+        }}
       />
 
       {agentId && isManager && (
         <Alert variant="info" title="Filtered by agent">
           Showing customers assigned to {agentName ?? "this agent"}.
-          <button type="button" onClick={clearAgentFilter} className="mt-1 inline-flex items-center gap-1 text-xs font-medium underline">
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            onClick={clearAgentFilter}
+            className="mt-1 h-auto gap-1 px-0"
+          >
             <X className="h-3 w-3" /> Clear filter
-          </button>
+          </Button>
         </Alert>
       )}
 
@@ -269,7 +298,9 @@ export function CustomersList() {
       {isError ? (
         <Alert variant="error" title="Could not load customers">
           {error instanceof Error ? error.message : "Something went wrong."}
-          <button type="button" onClick={() => refetch()} className="mt-2 text-xs font-medium underline">Try again</button>
+          <Button type="button" variant="link" size="sm" onClick={() => refetch()} className="mt-2 h-auto px-0">
+            Try again
+          </Button>
         </Alert>
       ) : isLoading ? (
         <TableSkeleton rows={10} cols={8} />
@@ -277,6 +308,7 @@ export function CustomersList() {
         <SmartEmptyState
           entity="customers"
           hasFilters={!!debouncedSearch || kyc !== "all" || !!agentId}
+          onAction={() => setCustomerModalOpen(true)}
           onClearFilters={() => {
             setSearch("");
             setKyc("all");
@@ -311,7 +343,13 @@ export function CustomersList() {
             </TableHeader>
             <TableBody>
               {customers.map((c) => (
-                <TableRow key={c.id} interactive selected={selected.has(c.id)}>
+                <TableRow
+                  key={c.id}
+                  interactive
+                  selected={selected.has(c.id)}
+                  onNavigate={() => router.push(`/dashboard/customers/${c.id}`)}
+                  navigateLabel={`View ${c.full_name}`}
+                >
                   <TableCell>
                     <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={`Select ${c.full_name}`} />
                   </TableCell>
@@ -323,9 +361,12 @@ export function CustomersList() {
                     <Badge variant={kycVariant[c.kyc_status] ?? "pending"} dot>{c.kyc_status}</Badge>
                   </TableCell>
                   <TableCell hideOnMobile className="hidden md:table-cell">{c.agent?.full_name ?? "—"}</TableCell>
-                  <TableCell align="right">
-                    <Link href={`/dashboard/customers/${c.id}`}>
-                      <Button variant="ghost" size="sm">View</Button>
+                  <TableCell align="right" data-row-action>
+                    <Link
+                      href={`/dashboard/customers/${c.id}`}
+                      className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    >
+                      View
                     </Link>
                   </TableCell>
                 </TableRow>

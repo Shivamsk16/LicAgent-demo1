@@ -90,6 +90,21 @@ export async function POST(request: Request) {
     return apiError("NOT_FOUND", "Customer not found", 404);
   }
 
+  const { data: recentDuplicate } = await admin
+    .from("policies")
+    .select("*")
+    .eq("tenant_id", ctx.tenantId)
+    .eq("policy_number", parsed.data.policy_number)
+    .eq("agent_id", ctx.userId)
+    .gte("created_at", new Date(Date.now() - 60_000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (recentDuplicate) {
+    return apiSuccess(recentDuplicate, 200);
+  }
+
   const maturity =
     parsed.data.maturity_date ??
     addYears(

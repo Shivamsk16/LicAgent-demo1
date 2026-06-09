@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,7 +83,11 @@ export function PaymentRecordForm() {
   const selectedCustomer = customers.find((c) => c.id === form.customer_id);
   const selectedPolicy = policies.find((p) => p.id === form.policy_id);
 
+  const submittingRef = useRef(false);
+
   async function submit() {
+    if (loading || submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     const res = await fetch("/api/payments", {
       method: "POST",
@@ -102,13 +106,14 @@ export function PaymentRecordForm() {
       }),
     });
     const json = await res.json();
-    setLoading(false);
     setConfirmOpen(false);
     if (json.success) {
       const { toast } = await import("@/lib/toast");
       toast.success("Payment recorded");
       router.push(`/dashboard/payments/${json.data.id}`);
     } else {
+      submittingRef.current = false;
+      setLoading(false);
       const { toast } = await import("@/lib/toast");
       toast.error("Could not record payment", json.error?.message);
     }

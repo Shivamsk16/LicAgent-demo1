@@ -57,7 +57,7 @@ function daysLeftChip(due: string) {
 
 const quickActions = [
   { href: "/dashboard/payments/record", label: "Record payment", icon: Wallet, primary: true },
-  { href: "/dashboard/customers/new", label: "Add customer", icon: UserPlus },
+  { href: "/dashboard/customers?new=1", label: "Add customer", icon: UserPlus },
   { href: "/dashboard/policies/new", label: "Add policy", icon: FileText },
   { href: "/dashboard/reminders", label: "View reminders", icon: CalendarClock },
 ];

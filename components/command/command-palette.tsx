@@ -44,7 +44,7 @@ const NAV_ITEMS: PaletteItem[] = [
 ];
 
 const ACTION_ITEMS: PaletteItem[] = [
-  { id: "act-customer", label: "Add customer", icon: UserPlus, href: "/dashboard/customers/new", group: "Actions" },
+  { id: "act-customer", label: "Add customer", icon: UserPlus, href: "/dashboard/customers?new=1", group: "Actions" },
   { id: "act-policy", label: "Add policy", icon: FileText, href: "/dashboard/policies/new", group: "Actions" },
   { id: "act-payment", label: "Record payment", icon: Plus, href: "/dashboard/payments/record", group: "Actions" },
 ];

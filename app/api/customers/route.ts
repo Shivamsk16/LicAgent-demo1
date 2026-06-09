@@ -78,6 +78,22 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+
+  const { data: recentDuplicate } = await admin
+    .from("customers")
+    .select("*")
+    .eq("tenant_id", ctx.tenantId)
+    .eq("phone", parsed.data.phone)
+    .eq("assigned_agent_id", ctx.userId)
+    .gte("created_at", new Date(Date.now() - 60_000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (recentDuplicate) {
+    return apiSuccess(recentDuplicate, 200);
+  }
+
   const customerCode = await generateCustomerCode(
     ctx.tenantId,
     ctx.tenant.branch_code

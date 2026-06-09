@@ -15,7 +15,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "policies", keys: "G then P", label: "Go to policies", group: "Navigation", href: "/dashboard/policies" },
   { id: "payments", keys: "G then Y", label: "Go to payments", group: "Navigation", href: "/dashboard/payments" },
   { id: "reports", keys: "G then R", label: "Go to reports", group: "Navigation", href: "/dashboard/reports" },
-  { id: "new-customer", keys: "N", label: "New customer", group: "Actions", href: "/dashboard/customers/new" },
+  { id: "new-customer", keys: "N", label: "New customer", group: "Actions", href: "/dashboard/customers?new=1" },
   { id: "new-policy", keys: "Shift P", label: "New policy", group: "Actions", href: "/dashboard/policies/new" },
   { id: "record-payment", keys: "R", label: "Record payment", group: "Actions", action: "record-payment" },
 ];

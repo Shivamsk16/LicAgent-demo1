@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTableBulkBar } from "@/components/shared/data-table-bulk-bar";
 import { SavedFilters } from "@/components/shared/saved-filters";
 import { MobileFilterSheet } from "@/components/shared/mobile-filter-sheet";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,7 @@ type PaymentsResponse = PaginatedResult<Payment> & {
 };
 
 export function PaymentsLedger() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState(() => searchParams.get("status") ?? "all");
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
@@ -172,7 +173,9 @@ export function PaymentsLedger() {
       {isError ? (
         <Alert variant="error" title="Could not load payments">
           {error instanceof Error ? error.message : "Something went wrong."}
-          <button type="button" onClick={() => refetch()} className="mt-2 text-xs font-medium underline">Try again</button>
+          <Button type="button" variant="link" size="sm" onClick={() => refetch()} className="mt-2 h-auto px-0">
+            Try again
+          </Button>
         </Alert>
       ) : isLoading ? (
         <TableSkeleton rows={10} cols={10} />
@@ -202,7 +205,13 @@ export function PaymentsLedger() {
             </TableHeader>
             <TableBody>
               {payments.map((p) => (
-                <TableRow key={p.id} interactive selected={selected.has(p.id)}>
+                <TableRow
+                  key={p.id}
+                  interactive
+                  selected={selected.has(p.id)}
+                  onNavigate={() => router.push(`/dashboard/payments/${p.id}`)}
+                  navigateLabel={`View payment receipt ${p.receipt_number ?? p.id}`}
+                >
                   <TableCell><input type="checkbox" checked={selected.has(p.id)} onChange={() => setSelected((prev) => { const n = new Set(prev); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })} aria-label={`Select payment ${p.receipt_number ?? p.id}`} /></TableCell>
                   <TableCell mono sticky>{formatDateIST(p.payment_date)}</TableCell>
                   <TableCell hideOnMobile className="hidden md:table-cell truncate">{p.customer?.full_name}</TableCell>
@@ -213,8 +222,13 @@ export function PaymentsLedger() {
                   <TableCell hideOnMobile className="hidden lg:table-cell">{p.payment_mode}</TableCell>
                   <TableCell mono hideOnMobile className="hidden lg:table-cell">{p.receipt_number ?? "—"}</TableCell>
                   <TableCell><Badge variant="active" dot>{p.status}</Badge></TableCell>
-                  <TableCell align="right">
-                    <Link href={`/dashboard/payments/${p.id}`}><Button variant="ghost" size="sm">Receipt</Button></Link>
+                  <TableCell align="right" data-row-action>
+                    <Link
+                      href={`/dashboard/payments/${p.id}`}
+                      className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    >
+                      Receipt
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

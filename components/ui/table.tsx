@@ -103,20 +103,56 @@ export function TableRow({
   className,
   interactive,
   selected,
+  onNavigate,
+  navigateLabel,
 }: {
   children: React.ReactNode;
   className?: string;
   interactive?: boolean;
   selected?: boolean;
+  onNavigate?: () => void;
+  navigateLabel?: string;
 }) {
+  const clickable = !!onNavigate;
+
+  function shouldIgnoreClick(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false;
+    return !!target.closest(
+      "button, a, input, select, textarea, label, [data-row-action]"
+    );
+  }
+
   return (
     <tr
       className={cn(
         "transition-colors duration-fast ease-out",
-        interactive && "group cursor-default hover:bg-black/[0.02]",
+        (interactive || clickable) && "group hover:bg-black/[0.02]",
+        clickable && "cursor-pointer",
+        !clickable && interactive && "cursor-default",
         selected && "bg-lic-blue-50/50",
         className
       )}
+      onClick={
+        clickable
+          ? (e) => {
+              if (shouldIgnoreClick(e.target)) return;
+              onNavigate();
+            }
+          : undefined
+      }
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onNavigate();
+              }
+            }
+          : undefined
+      }
+      tabIndex={clickable ? 0 : undefined}
+      role={clickable ? "link" : undefined}
+      aria-label={clickable ? navigateLabel : undefined}
     >
       {children}
     </tr>

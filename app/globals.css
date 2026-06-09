@@ -236,23 +236,49 @@
   }
 
   /* ── Dialog ── */
-  dialog.modal {
-    @apply fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-xl bg-lic-neutral-0 p-0 shadow-lg ring-1 ring-black/[0.08];
+  dialog.modal,
+  dialog.dialog {
+    /* inset:0 + margin:auto centers native <dialog> reliably (no top-edge snap) */
+    @apply fixed inset-0 m-auto w-full overflow-hidden rounded-2xl border-0 bg-lic-neutral-0 p-0 shadow-xl ring-1 ring-black/[0.08];
+    height: fit-content;
+    max-height: min(85vh, calc(100vh - 2rem));
     opacity: 0;
-    transform: translate(-50%, -48%) scale(0.98);
+    transform: scale(0.98);
     transition:
       opacity var(--duration-normal) var(--ease-out),
       transform var(--duration-normal) var(--ease-out);
   }
 
-  dialog.modal[open] {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+  dialog.modal {
+    @apply max-w-md;
   }
 
-  dialog.modal::backdrop {
-    background: rgb(10 10 11 / 0.35);
-    backdrop-filter: blur(4px);
+  dialog.dialog-wizard {
+    width: min(1100px, 95vw);
+    max-width: 1100px;
+    height: 80vh;
+    max-height: 80vh;
+    @apply max-w-none shadow-2xl;
+  }
+
+  dialog.dialog-crm {
+    width: min(1100px, 90vw);
+    max-width: 1100px;
+    height: 80vh;
+    max-height: 80vh;
+    @apply max-w-none shadow-[0_24px_48px_-12px_rgb(0_0_0/0.18),0_0_0_1px_rgb(0_0_0/0.05)];
+  }
+
+  dialog.modal[open],
+  dialog.dialog[open] {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  dialog.modal::backdrop,
+  dialog.dialog::backdrop {
+    background: rgb(10 10 11 / 0.5);
+    backdrop-filter: blur(6px);
     transition: opacity var(--duration-normal) var(--ease-out);
   }
 }
