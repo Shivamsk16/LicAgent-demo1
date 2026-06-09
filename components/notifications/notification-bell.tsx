@@ -10,8 +10,25 @@ import { Button } from "@/components/ui/button";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { cn } from "@/lib/utils/cn";
 
+function useDeferredReady(delayMs = 1500) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const ready = () => setReady(true);
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(ready, { timeout: delayMs });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(ready, Math.min(delayMs, 500));
+    return () => clearTimeout(id);
+  }, [delayMs]);
+
+  return ready;
+}
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const fetchReady = useDeferredReady();
   const qc = useQueryClient();
   const qcRef = useRef(qc);
   qcRef.current = qc;
@@ -22,22 +39,26 @@ export function NotificationBell() {
     queryFn: async () => {
       const res = await fetch("/api/notifications");
       const json = await res.json();
-      return json.data as {
-        notifications: Array<{
-          id: string;
-          title: string;
-          body: string | null;
-          link: string | null;
-          read: boolean;
-          created_at: string;
-        }>;
-        unreadCount: number;
-      };
+      const notifications = (json.data?.notifications ?? []) as Array<{
+        id: string;
+        title: string;
+        body: string | null;
+        link: string | null;
+        read: boolean;
+        created_at: string;
+      }>;
+      const unreadCount =
+        json.data?.unreadCount ??
+        notifications.filter((n) => !n.read).length;
+      return { notifications, unreadCount };
     },
-    refetchInterval: 30_000,
+    enabled: fetchReady,
+    refetchInterval: fetchReady ? 30_000 : false,
   });
 
   useEffect(() => {
+    if (!fetchReady) return;
+
     const supabase = createClient();
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -51,7 +72,6 @@ export function NotificationBell() {
       const channelName = `notifications-${user.id}`;
       const topic = `realtime:${channelName}`;
 
-      // React Strict Mode can remount before cleanup; drop any stale channel first.
       const existing = supabase.getChannels().find((ch) => ch.topic === topic);
       if (existing) {
         await supabase.removeChannel(existing);
@@ -89,7 +109,7 @@ export function NotificationBell() {
         channel = null;
       }
     };
-  }, []);
+  }, [fetchReady]);
 
   const unread = data?.unreadCount ?? 0;
   const items = data?.notifications ?? [];

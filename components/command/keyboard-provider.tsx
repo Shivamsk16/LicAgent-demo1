@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, usePathname } from "next/navigation";
 import { useCommandPaletteStore } from "@/store/command-palette";
-import { CommandPalette } from "./command-palette";
-import { KeyboardShortcutsDialog } from "./keyboard-shortcuts-dialog";
+
+const CommandPalette = dynamic(
+  () =>
+    import("./command-palette").then((m) => ({ default: m.CommandPalette })),
+  { ssr: false }
+);
+
+const KeyboardShortcutsDialog = dynamic(
+  () =>
+    import("./keyboard-shortcuts-dialog").then((m) => ({
+      default: m.KeyboardShortcutsDialog,
+    })),
+  { ssr: false }
+);
 
 export function KeyboardProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,6 +27,17 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
   const paletteOpen = useCommandPaletteStore((s) => s.open);
   const chordRef = useRef<string | null>(null);
   const chordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [overlaysReady, setOverlaysReady] = useState(false);
+
+  useEffect(() => {
+    const ready = () => setOverlaysReady(true);
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(ready, { timeout: 2000 });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(ready, 500);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     function isTypingTarget(el: EventTarget | null) {
@@ -28,6 +52,13 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
     }
 
     function onKeyDown(e: KeyboardEvent) {
+      if (!overlaysReady && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOverlaysReady(true);
+        setOpen(true);
+        return;
+      }
+
       if (paletteOpen) return;
 
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -40,6 +71,7 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 
       if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
+        setOverlaysReady(true);
         setShortcutsOpen(true);
         return;
       }
@@ -93,13 +125,17 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [pathname, paletteOpen, router, setOpen, setShortcutsOpen]);
+  }, [pathname, paletteOpen, overlaysReady, router, setOpen, setShortcutsOpen]);
 
   return (
     <>
       {children}
-      <CommandPalette />
-      <KeyboardShortcutsDialog />
+      {overlaysReady && (
+        <>
+          <CommandPalette />
+          <KeyboardShortcutsDialog />
+        </>
+      )}
     </>
   );
 }

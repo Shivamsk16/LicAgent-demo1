@@ -1,4 +1,4 @@
-import { getSessionUser } from "@/lib/auth/super-admin";
+import { getSessionUser, getActiveMemberships } from "@/lib/auth/cached-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { apiError, apiSuccess } from "@/lib/api/response";
 
@@ -6,18 +6,24 @@ export async function GET() {
   const user = await getSessionUser();
   if (!user) return apiError("UNAUTHORIZED", "Not signed in", 401);
 
+  const memberships = await getActiveMemberships(user.id);
+  if (!memberships.length) return apiSuccess([]);
+
   const admin = createAdminClient();
-  const { data } = await admin
-    .from("tenant_members")
-    .select("tenant_id, tenants(id, name)")
-    .eq("user_id", user.id)
-    .eq("status", "active");
+  const tenantIds = memberships.map((m) => m.tenant_id);
+  const { data: tenants } = await admin
+    .from("tenants")
+    .select("id, name")
+    .in("id", tenantIds);
 
-  const tenants = (data ?? []).map((m) => {
-    const t = m.tenants as { id: string; name: string } | { id: string; name: string }[] | null;
-    const row = Array.isArray(t) ? t[0] : t;
-    return { id: row?.id ?? m.tenant_id, name: row?.name ?? "Branch" };
-  });
+  const nameById = new Map(
+    (tenants ?? []).map((t) => [t.id, t.name as string])
+  );
 
-  return apiSuccess(tenants);
+  const result = memberships.map((m) => ({
+    id: m.tenant_id,
+    name: nameById.get(m.tenant_id) ?? "Branch",
+  }));
+
+  return apiSuccess(result);
 }

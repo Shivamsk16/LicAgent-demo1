@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
@@ -12,14 +13,28 @@ import {
 import { StatCard, StatGrid } from "@/components/ui/stat-card";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SignupsChart } from "@/components/charts/signups-chart";
-import { PlanDonutChart } from "@/components/charts/plan-donut";
 import { TenantsTable } from "@/components/superadmin/tenants-table";
 import { Alert } from "@/components/ui/alert";
 import { formatINR } from "@/lib/utils/currency";
 import { formatDateIST } from "@/lib/utils/dates";
 import { StatGridSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import type { TenantWithStats } from "@/types/database";
+
+const SignupsChart = dynamic(
+  () =>
+    import("@/components/charts/signups-chart").then((m) => ({
+      default: m.SignupsChart,
+    })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const PlanDonutChart = dynamic(
+  () =>
+    import("@/components/charts/plan-donut").then((m) => ({
+      default: m.PlanDonutChart,
+    })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
 
 export function OverviewDashboard() {
   const { data, isLoading, error } = useQuery({

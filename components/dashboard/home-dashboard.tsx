@@ -62,15 +62,38 @@ const quickActions = [
   { href: "/dashboard/reminders", label: "View reminders", icon: CalendarClock },
 ];
 
-export function HomeDashboard() {
+type DashboardStatsData = {
+  tenantName: string;
+  role: string;
+  customerCount: number;
+  activePolicies: number;
+  premiumsDueThisMonth: number;
+  overdueCount: number;
+  kycPending: number;
+  paymentCount: number;
+  commissionMonth: number;
+  dueThisWeek: unknown[];
+  recentPayments: unknown[];
+  isManager: boolean;
+};
+
+export function HomeDashboard({
+  initialData,
+}: {
+  initialData?: DashboardStatsData;
+}) {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
       const res = await fetch("/api/dashboard/stats");
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message);
-      return json.data;
+      return json.data as DashboardStatsData;
     },
+    initialData,
+    staleTime: initialData ? 60_000 : 0,
+    refetchOnMount: initialData ? false : true,
+    refetchOnWindowFocus: false,
   });
 
   const dateStr = format(new Date(), "EEEE, d MMMM yyyy");

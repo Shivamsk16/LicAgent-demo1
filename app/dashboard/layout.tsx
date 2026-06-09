@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { getDashboardContext } from "@/lib/auth/dashboard-context";
-import { isSuperAdmin, getSessionUser } from "@/lib/auth/super-admin";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { isSuperAdmin, getSessionUser } from "@/lib/auth/cached-auth";
+import { QueryProviders } from "@/app/query-providers";
 
 export default async function DashboardLayout({
   children,
@@ -20,27 +20,17 @@ export default async function DashboardLayout({
   if (error === "ACCOUNT_SUSPENDED") redirect("/account-suspended");
   if (error === "FORBIDDEN" || !ctx) redirect("/account-suspended");
 
-  let userName: string | undefined;
-  try {
-    const admin = createAdminClient();
-    const { data } = await admin
-      .from("users")
-      .select("full_name")
-      .eq("id", ctx.userId)
-      .single();
-    userName = data?.full_name;
-  } catch {
-    /* profile optional */
-  }
-
   return (
-    <DashboardShell
-      tenantId={ctx.tenantId}
-      tenantName={ctx.tenant.name}
-      role={ctx.role}
-      userName={userName}
-    >
-      {children}
-    </DashboardShell>
+    <QueryProviders>
+      <DashboardShell
+        tenantId={ctx.tenantId}
+        tenantName={ctx.tenant.name}
+        role={ctx.role}
+        userName={ctx.userName}
+        membershipCount={ctx.membershipCount}
+      >
+        {children}
+      </DashboardShell>
+    </QueryProviders>
   );
 }

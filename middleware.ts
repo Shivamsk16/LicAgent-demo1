@@ -23,6 +23,66 @@ const PUBLIC_ROUTES = [
 
 const ACCOUNT_STATUS_ROUTES = ["/trial-expired", "/account-suspended"];
 
+type ResolvedMembership = {
+  tenantId: string;
+  role: string;
+  count: number;
+};
+
+async function applyTenantHeaders(
+  request: NextRequest,
+  supabaseResponse: NextResponse,
+  user: { id: string; email?: string; fullName?: string },
+  membership: ResolvedMembership
+): Promise<NextResponse> {
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-user-id", user.id);
+  requestHeaders.set("x-user-email", user.email ?? "");
+  requestHeaders.set("x-tenant-id", membership.tenantId);
+  requestHeaders.set("x-user-role", membership.role);
+  requestHeaders.set("x-membership-count", String(membership.count));
+  if (user.fullName) {
+    requestHeaders.set("x-user-full-name", user.fullName);
+  }
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+  supabaseResponse.cookies.getAll().forEach((c) => response.cookies.set(c));
+  if (!request.cookies.get("active_tenant")) {
+    response.cookies.set("active_tenant", membership.tenantId, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax",
+    });
+  }
+  return response;
+}
+
+async function resolveActiveMembership(
+  request: NextRequest,
+  userId: string
+): Promise<ResolvedMembership | null> {
+  let memberships: Awaited<ReturnType<typeof getActiveMemberships>> = [];
+  try {
+    memberships = await getActiveMemberships(userId);
+  } catch {
+    return null;
+  }
+  if (!memberships.length) return null;
+
+  const activeTenant =
+    request.cookies.get("active_tenant")?.value ?? memberships[0].tenant_id;
+  const membership =
+    memberships.find((m) => m.tenant_id === activeTenant) ?? memberships[0];
+
+  return {
+    tenantId: membership.tenant_id,
+    role: membershipRole(membership),
+    count: memberships.length,
+  };
+}
+
 async function isSuperAdmin(userId: string): Promise<boolean> {
   try {
     const admin = createAdminClient();
@@ -97,55 +157,55 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (user && pathname.startsWith("/dashboard")) {
-    const superAdmin = await isSuperAdmin(user.id);
-    if (superAdmin) {
+  if (user && pathname.startsWith("/api/superadmin")) {
+    return supabaseResponse;
+  }
+
+  if (
+    user &&
+    (pathname.startsWith("/dashboard") ||
+      (pathname.startsWith("/api/") && !isPublicApiRoute(pathname)))
+  ) {
+    const [superAdmin, resolved] = await Promise.all([
+      isSuperAdmin(user.id),
+      resolveActiveMembership(request, user.id),
+    ]);
+
+    if (superAdmin && pathname.startsWith("/dashboard")) {
       return supabaseResponse;
     }
 
-    let memberships: Awaited<ReturnType<typeof getActiveMemberships>> = [];
-    try {
-      memberships = await getActiveMemberships(user.id);
-    } catch {
-      /* membership lookup failed */
-    }
-
-    if (!memberships.length) {
+    if (!resolved) {
+      if (pathname.startsWith("/api/")) {
+        return apiUnauthorizedResponse();
+      }
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("error", "no_tenant");
       return NextResponse.redirect(url);
     }
 
-    const activeTenant =
-      request.cookies.get("active_tenant")?.value ?? memberships[0].tenant_id;
-    const membership =
-      memberships.find((m) => m.tenant_id === activeTenant) ?? memberships[0];
+    const admin = createAdminClient();
+    const [denial, { data: profile }] = await Promise.all([
+      getTenantDenialForMembership(resolved.tenantId),
+      admin.from("users").select("full_name").eq("id", user.id).single(),
+    ]);
 
-    const denial = await getTenantDenialForMembership(membership.tenant_id);
     if (denial) {
+      if (pathname.startsWith("/api/")) {
+        return apiUnauthorizedResponse();
+      }
       const url = request.nextUrl.clone();
       url.pathname = denialToPath(denial);
       return NextResponse.redirect(url);
     }
 
-    const role = membershipRole(membership);
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-tenant-id", membership.tenant_id);
-    requestHeaders.set("x-user-role", role);
-
-    const response = NextResponse.next({
-      request: { headers: requestHeaders },
-    });
-    supabaseResponse.cookies.getAll().forEach((c) => response.cookies.set(c));
-    if (!request.cookies.get("active_tenant")) {
-      response.cookies.set("active_tenant", membership.tenant_id, {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-        sameSite: "lax",
-      });
-    }
-    return response;
+    return applyTenantHeaders(
+      request,
+      supabaseResponse,
+      { id: user.id, email: user.email, fullName: profile?.full_name ?? undefined },
+      resolved
+    );
   }
 
   if (user && (pathname === "/login" || pathname === "/")) {

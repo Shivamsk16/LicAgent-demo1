@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { inviteTenantMember } from "@/lib/business/invite-member";
 import { apiError, apiSuccess } from "@/lib/api/response";
 import { applySort, paginated, parseListParams } from "@/lib/api/list-params";
+import { withApiTiming } from "@/lib/api/timing";
+import { getTeamMemberStats } from "@/lib/team/member-stats";
 import { z } from "zod";
 import { format } from "date-fns";
 
@@ -13,83 +15,99 @@ const SORT_COLUMNS = {
 };
 
 export async function GET(request: Request) {
-  const { error, ctx } = await getDashboardContext();
-  if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
-  if (ctx.role !== "branch_manager") {
-    return apiError("FORBIDDEN", "Branch manager only", 403);
-  }
+  return withApiTiming("GET /api/team", async () => {
+    const { error, ctx } = await getDashboardContext();
+    if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
+    if (ctx.role !== "branch_manager") {
+      return apiError("FORBIDDEN", "Branch manager only", 403);
+    }
 
-  const { searchParams } = new URL(request.url);
-  const list = parseListParams(searchParams, { defaultSort: "invited_at", defaultOrder: "desc" });
-  const status = searchParams.get("status");
+    const { searchParams } = new URL(request.url);
+    const list = parseListParams(searchParams, {
+      defaultSort: "invited_at",
+      defaultOrder: "desc",
+    });
+    const status = searchParams.get("status");
 
-  const admin = createAdminClient();
-  let query = admin
-    .from("tenant_members")
-    .select(
-      `*, user:users(id, email, full_name, phone), role:roles(id, name, display_name)`,
-      { count: "exact" }
-    )
-    .eq("tenant_id", ctx.tenantId)
-    .neq("status", "removed");
+    const admin = createAdminClient();
+    let query = admin
+      .from("tenant_members")
+      .select(
+        `*, user:users(id, email, full_name, phone), role:roles(id, name, display_name)`,
+        { count: "exact" }
+      )
+      .eq("tenant_id", ctx.tenantId)
+      .neq("status", "removed");
 
-  if (status && status !== "all") query = query.eq("status", status);
+    if (status && status !== "all") query = query.eq("status", status);
 
-  query = applySort(query, list.sort, list.order, SORT_COLUMNS);
-  query = query.range(list.offset, list.offset + list.pageSize - 1);
+    query = applySort(query, list.sort, list.order, SORT_COLUMNS);
+    query = query.range(list.offset, list.offset + list.pageSize - 1);
 
-  const { data: members, error: dbError, count } = await query;
-  if (dbError) return apiError("SERVER_ERROR", dbError.message, 500);
+    const monthKey = format(new Date(), "yyyy-MM");
 
-  const monthKey = format(new Date(), "yyyy-MM");
-  const enriched = await Promise.all(
-    (members ?? []).map(async (m) => {
-      const uid = m.user_id;
-      const [{ count: customers }, { count: policies }, { data: comm }] = await Promise.all([
-        admin
-          .from("customers")
-          .select("*", { count: "exact", head: true })
-          .eq("tenant_id", ctx.tenantId)
-          .eq("assigned_agent_id", uid),
-        admin
-          .from("policies")
-          .select("*", { count: "exact", head: true })
-          .eq("tenant_id", ctx.tenantId)
-          .eq("agent_id", uid)
-          .eq("status", "in_force"),
-        admin
-          .from("commissions")
-          .select("net_commission")
-          .eq("tenant_id", ctx.tenantId)
-          .eq("agent_id", uid)
-          .eq("month", monthKey),
-      ]);
+    const [
+      { data: members, error: dbError, count },
+      { count: totalCount },
+      { count: activeCount },
+      { count: invitedCount },
+      { count: suspendedCount },
+    ] = await Promise.all([
+      query,
+      admin
+        .from("tenant_members")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", ctx.tenantId)
+        .neq("status", "removed"),
+      admin
+        .from("tenant_members")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", ctx.tenantId)
+        .eq("status", "active"),
+      admin
+        .from("tenant_members")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", ctx.tenantId)
+        .eq("status", "invited"),
+      admin
+        .from("tenant_members")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", ctx.tenantId)
+        .eq("status", "suspended"),
+    ]);
 
-      const commissionMonth = (comm ?? []).reduce(
-        (s, c) => s + Number(c.net_commission),
-        0
-      );
+    if (dbError) return apiError("SERVER_ERROR", dbError.message, 500);
 
-      return { ...m, stats: { customers: customers ?? 0, policies: policies ?? 0, commissionMonth } };
-    })
-  );
+    const userIds = (members ?? [])
+      .map((m) => m.user_id)
+      .filter((id): id is string => !!id);
+    const statsByUser = await getTeamMemberStats(
+      admin,
+      ctx.tenantId,
+      userIds,
+      monthKey
+    );
 
-  const { data: allForStats } = await admin
-    .from("tenant_members")
-    .select("status")
-    .eq("tenant_id", ctx.tenantId)
-    .neq("status", "removed");
+    const enriched = (members ?? []).map((m) => ({
+      ...m,
+      stats: statsByUser.get(m.user_id) ?? {
+        customers: 0,
+        policies: 0,
+        commissionMonth: 0,
+      },
+    }));
 
-  const stats = {
-    total: allForStats?.length ?? 0,
-    active: allForStats?.filter((m) => m.status === "active").length ?? 0,
-    invited: allForStats?.filter((m) => m.status === "invited").length ?? 0,
-    suspended: allForStats?.filter((m) => m.status === "suspended").length ?? 0,
-  };
+    const stats = {
+      total: totalCount ?? 0,
+      active: activeCount ?? 0,
+      invited: invitedCount ?? 0,
+      suspended: suspendedCount ?? 0,
+    };
 
-  return apiSuccess({
-    ...paginated(enriched, count ?? 0, list.page, list.pageSize),
-    stats,
+    return apiSuccess({
+      ...paginated(enriched, count ?? 0, list.page, list.pageSize),
+      stats,
+    });
   });
 }
 

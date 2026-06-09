@@ -22,12 +22,14 @@ export function DashboardShell({
   tenantName,
   role,
   userName,
+  membershipCount = 1,
 }: {
   children: React.ReactNode;
   tenantId: string;
   tenantName: string;
   role: DashboardRole;
   userName?: string;
+  membershipCount?: number;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const setContext = useTenantStore((s) => s.setContext);
@@ -83,7 +85,10 @@ export function DashboardShell({
                 </Button>
               </Link>
               <NotificationBell />
-              <TenantSwitcher currentTenantId={tenantId} />
+              <TenantSwitcher
+                currentTenantId={tenantId}
+                membershipCount={membershipCount}
+              />
               <Button
                 variant="ghost"
                 size="icon"

@@ -1,6 +1,7 @@
 import { SuperAdminShell } from "@/components/layout/superadmin-shell";
 import { getSessionUser } from "@/lib/auth/super-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { QueryProviders } from "@/app/query-providers";
 
 export default async function SuperAdminLayout({
   children,
@@ -23,5 +24,9 @@ export default async function SuperAdminLayout({
     /* env not configured */
   }
 
-  return <SuperAdminShell userName={userName}>{children}</SuperAdminShell>;
+  return (
+    <QueryProviders>
+      <SuperAdminShell userName={userName}>{children}</SuperAdminShell>
+    </QueryProviders>
+  );
 }

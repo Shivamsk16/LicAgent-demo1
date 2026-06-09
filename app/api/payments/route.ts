@@ -10,6 +10,11 @@ import {
   type FilterableQuery,
 } from "@/lib/api/list-params";
 import { fetchPolicyForContext } from "@/lib/auth/policy-access";
+import { withApiTiming } from "@/lib/api/timing";
+import {
+  buildPaymentsSummaryParams,
+  getPaymentsCollectedSummary,
+} from "@/lib/payments/summary";
 
 const SORT_COLUMNS = {
   payment_date: "payment_date",
@@ -45,54 +50,52 @@ function applyPaymentFilters(
 }
 
 export async function GET(request: Request) {
-  const { error, ctx } = await getDashboardContext();
-  if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
+  return withApiTiming("GET /api/payments", async () => {
+    const { error, ctx } = await getDashboardContext();
+    if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
 
-  const { searchParams } = new URL(request.url);
-  const list = parseListParams(searchParams, { defaultSort: "payment_date", defaultOrder: "desc" });
-  const admin = createAdminClient();
+    const { searchParams } = new URL(request.url);
+    const list = parseListParams(searchParams, {
+      defaultSort: "payment_date",
+      defaultOrder: "desc",
+    });
+    const admin = createAdminClient();
 
-  let countQuery = admin
-    .from("payments")
-    .select("*", { count: "exact", head: true })
-    .eq("tenant_id", ctx.tenantId);
-  countQuery = applyPaymentFilters(countQuery, ctx, searchParams);
+    let countQuery = admin
+      .from("payments")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", ctx.tenantId);
+    countQuery = applyPaymentFilters(countQuery, ctx, searchParams);
 
-  let dataQuery = admin
-    .from("payments")
-    .select(
-      `*, policy:policies(policy_number, plan_name),
+    let dataQuery = admin
+      .from("payments")
+      .select(
+        `*, policy:policies(policy_number, plan_name),
        customer:customers(full_name),
        recorder:users!recorded_by(full_name)`,
-      { count: "exact" }
-    )
-    .eq("tenant_id", ctx.tenantId);
-  dataQuery = applyPaymentFilters(dataQuery, ctx, searchParams);
-  dataQuery = applySort(dataQuery, list.sort, list.order, SORT_COLUMNS);
-  dataQuery = dataQuery.range(list.offset, list.offset + list.pageSize - 1);
+        { count: "exact" }
+      )
+      .eq("tenant_id", ctx.tenantId);
+    dataQuery = applyPaymentFilters(dataQuery, ctx, searchParams);
+    dataQuery = applySort(dataQuery, list.sort, list.order, SORT_COLUMNS);
+    dataQuery = dataQuery.range(list.offset, list.offset + list.pageSize - 1);
 
-  const [{ count: total }, { data, error: dbError }] = await Promise.all([
-    countQuery,
-    dataQuery,
-  ]);
-  if (dbError) return apiError("SERVER_ERROR", dbError.message, 500);
+    const summaryParams = buildPaymentsSummaryParams(ctx, searchParams);
 
-  let summaryQuery = admin
-    .from("payments")
-    .select("amount_paid, late_fee, status")
-    .eq("tenant_id", ctx.tenantId)
-    .eq("status", "paid");
-  summaryQuery = applyPaymentFilters(summaryQuery, ctx, searchParams);
-  const { data: summaryRows } = await summaryQuery.limit(5000);
+    const [{ count: total }, { data, error: dbError }, summary] =
+      await Promise.all([
+        countQuery,
+        dataQuery,
+        getPaymentsCollectedSummary(admin, summaryParams),
+      ]);
 
-  const totalCollected = (summaryRows ?? []).reduce(
-    (s, p) => s + Number(p.amount_paid) + Number(p.late_fee ?? 0),
-    0
-  );
+    if (dbError) return apiError("SERVER_ERROR", dbError.message, 500);
+    if (summary.error) return apiError("SERVER_ERROR", summary.error, 500);
 
-  return apiSuccess({
-    ...paginated(data ?? [], total ?? 0, list.page, list.pageSize),
-    summary: { totalCollected },
+    return apiSuccess({
+      ...paginated(data ?? [], total ?? 0, list.page, list.pageSize),
+      summary: { totalCollected: summary.totalCollected },
+    });
   });
 }
 

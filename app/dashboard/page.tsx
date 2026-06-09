@@ -1,37 +1,17 @@
-import { Suspense } from "react";
-import dynamic from "next/dynamic";
-import { PageHeaderSkeleton, StatGridSkeleton } from "@/components/ui/skeleton";
+import { getDashboardContext } from "@/lib/auth/dashboard-context";
+import { getAgentDashboardStats } from "@/lib/dashboard/queries";
+import { HomeDashboard } from "@/components/dashboard/home-dashboard";
 
-const HomeDashboard = dynamic(
-  () =>
-    import("@/components/dashboard/home-dashboard").then((m) => ({
-      default: m.HomeDashboard,
-    })),
-  {
-    loading: () => (
-      <div className="section-stack">
-        <PageHeaderSkeleton />
-        <StatGridSkeleton count={5} />
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="h-72 rounded-xl bg-black/[0.04] lg:col-span-2" />
-          <div className="h-72 rounded-xl bg-black/[0.04]" />
-        </div>
-      </div>
-    ),
-  }
-);
+export default async function DashboardPage() {
+  const { ctx } = await getDashboardContext();
+  if (!ctx) return null;
 
-export default function DashboardPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="section-stack">
-          <PageHeaderSkeleton />
-          <StatGridSkeleton count={5} />
-        </div>
-      }
-    >
-      <HomeDashboard />
-    </Suspense>
-  );
+  const stats = await getAgentDashboardStats(ctx);
+  const initialData = {
+    ...stats,
+    tenantName: ctx.tenant.name,
+    role: ctx.role,
+  };
+
+  return <HomeDashboard initialData={initialData} />;
 }

@@ -19,14 +19,17 @@ export async function GET(request: Request) {
 
   if (unreadOnly) query = query.eq("read", false);
 
-  const { data, error: dbError } = await query;
+  const [{ data, error: dbError }, { count: unreadCount }] = await Promise.all([
+    query,
+    admin
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", ctx.userId)
+      .eq("tenant_id", ctx.tenantId)
+      .eq("read", false),
+  ]);
+
   if (dbError) return apiError("SERVER_ERROR", dbError.message, 500);
 
-  const { count } = await admin
-    .from("notifications")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", ctx.userId)
-    .eq("read", false);
-
-  return apiSuccess({ notifications: data, unreadCount: count ?? 0 });
+  return apiSuccess({ notifications: data, unreadCount: unreadCount ?? 0 });
 }

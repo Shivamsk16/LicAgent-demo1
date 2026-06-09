@@ -1,8 +1,10 @@
 import { getDashboardContext } from "@/lib/auth/dashboard-context";
 import { getAgentDashboardStats } from "@/lib/dashboard/queries";
 import { apiError, apiSuccess } from "@/lib/api/response";
+import { withApiTiming } from "@/lib/api/timing";
 
 export async function GET() {
+  return withApiTiming("GET /api/dashboard/stats", async () => {
   const { error, ctx } = await getDashboardContext();
   if (error === "UNAUTHORIZED") return apiError("UNAUTHORIZED", "Not signed in", 401);
   if (error === "NO_TENANT") return apiError("FORBIDDEN", "No active branch", 403);
@@ -20,4 +22,5 @@ export async function GET() {
       500
     );
   }
+  });
 }

@@ -5,7 +5,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Select } from "@/components/ui/select";
 import { Building2 } from "lucide-react";
 
-export function TenantSwitcher({ currentTenantId }: { currentTenantId: string }) {
+export function TenantSwitcher({
+  currentTenantId,
+  membershipCount = 1,
+}: {
+  currentTenantId: string;
+  membershipCount?: number;
+}) {
   const router = useRouter();
   const { data: tenants = [] } = useQuery({
     queryKey: ["my-tenants"],
@@ -14,9 +20,10 @@ export function TenantSwitcher({ currentTenantId }: { currentTenantId: string })
       const json = await res.json();
       return json.success ? json.data : [];
     },
+    enabled: membershipCount > 1,
   });
 
-  if (tenants.length <= 1) return null;
+  if (membershipCount <= 1) return null;
 
   async function switchTenant(tenantId: string) {
     await fetch("/api/tenant/switch", {

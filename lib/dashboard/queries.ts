@@ -19,7 +19,7 @@ export async function getAgentDashboardStats(ctx: DashboardContext) {
     { count: overdueCount },
     { count: kycPending },
     { count: paymentCount },
-    { data: commissions },
+    commissionResult,
     { data: dueThisWeek },
     { data: recentPayments },
   ] = await Promise.all([
@@ -75,11 +75,11 @@ export async function getAgentDashboardStats(ctx: DashboardContext) {
     (() => {
       let q = admin
         .from("commissions")
-        .select("net_commission")
+        .select("net_commission.sum()")
         .eq("tenant_id", ctx.tenantId)
         .eq("month", monthKey);
       if (!ctx.isManager) q = q.eq("agent_id", ctx.userId);
-      return q;
+      return q.single();
     })(),
     (() => {
       let q = admin
@@ -112,10 +112,14 @@ export async function getAgentDashboardStats(ctx: DashboardContext) {
     })(),
   ]);
 
-  const commissionMonth = (commissions ?? []).reduce(
-    (s, c) => s + Number(c.net_commission),
-    0
-  );
+  const commissionRow = commissionResult.data as {
+    net_commission?: number | { sum: number | null } | null;
+  } | null;
+  const commissionMonth =
+    typeof commissionRow?.net_commission === "object" &&
+    commissionRow?.net_commission !== null
+      ? Number(commissionRow.net_commission.sum ?? 0)
+      : Number(commissionRow?.net_commission ?? 0);
 
   return {
     customerCount: customerCount ?? 0,
