@@ -1,5 +1,9 @@
 /** API routes reachable without a session (onboarding, health). */
-const PUBLIC_API_PREFIXES = ["/api/auth/accept-invite", "/api/health"] as const;
+const PUBLIC_API_PREFIXES = [
+  "/api/auth/accept-invite",
+  "/api/auth/forgot-password",
+  "/api/health",
+] as const;
 
 export function isPublicApiRoute(pathname: string): boolean {
   return PUBLIC_API_PREFIXES.some(

@@ -4,6 +4,11 @@ export function getAppUrl(): string {
   return url.replace(/\/$/, "");
 }
 
+/** Supabase resetPasswordForEmail redirect — PKCE code lands on /auth/callback. */
+export function getPasswordResetCallbackUrl(): string {
+  return `${getAppUrl()}/auth/callback?next=/reset-password`;
+}
+
 /** Supabase inviteUserByEmail redirect — hash tokens land here. */
 export function getInviteCompleteUrl(): string {
   return `${getAppUrl()}/invite/complete`;

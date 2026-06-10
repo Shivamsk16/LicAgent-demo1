@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormField } from "@/components/ui/form";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
-import { getAppUrl } from "@/lib/auth/app-url";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -20,16 +18,24 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getAppUrl()}/auth/callback?next=/reset-password`,
-    });
-    setLoading(false);
-    if (authError) {
-      setError(authError.message);
-      return;
+
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setError(json.error?.message ?? "Failed to send reset link");
+        return;
+      }
+      setSent(true);
+    } catch {
+      setError("Failed to send reset link");
+    } finally {
+      setLoading(false);
     }
-    setSent(true);
   }
 
   return (

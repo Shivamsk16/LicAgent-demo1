@@ -1,4 +1,5 @@
 import { differenceInMonths, format } from "date-fns";
+import { getAppUrl } from "@/lib/auth/app-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAction } from "@/lib/audit";
 import { createNotification } from "@/lib/notifications/create";
@@ -107,7 +108,7 @@ export async function initiateRevival(params: {
     .eq("tenant_id", params.tenantId)
     .eq("status", "active");
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
 
   for (const m of managers ?? []) {
     const role = m.roles as { name: string } | { name: string }[] | null;
