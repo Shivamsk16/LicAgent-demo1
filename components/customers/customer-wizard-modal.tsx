@@ -26,15 +26,18 @@ import {
   customerWizardSchema,
   type CustomerWizardFormValues,
 } from "@/lib/forms/customer-wizard-schema";
+import type { Customer } from "@/types/business";
 
 export function CustomerWizardModal({
   open,
   onOpenChange,
   onSuccess,
+  onCustomerCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  onCustomerCreated?: (customer: Customer) => void;
 }) {
   const submittingRef = useRef(false);
   const [step, setStep] = useState(0);
@@ -159,6 +162,7 @@ export function CustomerWizardModal({
 
       localStorage.removeItem(CUSTOMER_WIZARD_DRAFT_KEY);
       initialSnapshotRef.current = JSON.stringify(values);
+      onCustomerCreated?.(json.data);
       onSuccess?.();
       onOpenChange(false);
     } catch {

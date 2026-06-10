@@ -14,7 +14,7 @@ import { CRMModal } from "@/components/ui/crm-modal";
 import { CRMStepIndicator } from "@/components/ui/crm-step-indicator";
 import { ModalFooterActions } from "@/components/ui/modal-footer-actions";
 import { ReviewSummary, formatLabel } from "@/components/shared/review-summary";
-import { CustomerQuickCreateModal } from "@/components/policies/customer-quick-create-modal";
+import { CustomerWizardModal } from "@/components/customers/customer-wizard-modal";
 import { formatINR } from "@/lib/utils/currency";
 import { formatDateIST } from "@/lib/utils/dates";
 import { fieldErrorClass, focusFormField } from "@/lib/forms/step-validation";
@@ -190,10 +190,17 @@ export function PolicyWizardModal({
   }
 
   function handleCustomerCreated(customer: Customer) {
-    setCustomers((prev) =>
-      [...prev, customer].sort((a, b) => a.full_name.localeCompare(b.full_name))
-    );
-    setValue("customer_id", customer.id, { shouldDirty: true, shouldValidate: true });
+    setCustomers((prev) => {
+      if (prev.some((c) => c.id === customer.id)) return prev;
+      return [...prev, customer].sort((a, b) =>
+        a.full_name.localeCompare(b.full_name)
+      );
+    });
+    setValue("customer_id", customer.id, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    loadCustomers();
   }
 
   async function onSubmit() {
@@ -628,10 +635,10 @@ export function PolicyWizardModal({
             </form>
       </CRMModal>
 
-      <CustomerQuickCreateModal
+      <CustomerWizardModal
         open={customerModalOpen}
         onOpenChange={setCustomerModalOpen}
-        onCreated={handleCustomerCreated}
+        onCustomerCreated={handleCustomerCreated}
       />
     </>
   );
