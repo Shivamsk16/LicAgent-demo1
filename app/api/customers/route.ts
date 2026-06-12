@@ -4,6 +4,7 @@ import { generateCustomerCode } from "@/lib/business/customer-code";
 import { customerSchema } from "@/lib/utils/validators";
 import { logAction } from "@/lib/audit";
 import { apiError, apiSuccess } from "@/lib/api/response";
+import { validationApiError } from "@/lib/api/zod-error";
 import { applySort, paginated, parseListParams } from "@/lib/api/list-params";
 
 const SORT_COLUMNS = {
@@ -14,6 +15,8 @@ const SORT_COLUMNS = {
   city: "city",
   kyc_status: "kyc_status",
 };
+
+const DEDUPE_WINDOW_MS = 5_000;
 
 function buildCustomerQuery(
   admin: ReturnType<typeof createAdminClient>,
@@ -27,7 +30,8 @@ function buildCustomerQuery(
   let query = admin
     .from("customers")
     .select(`*, agent:users!assigned_agent_id(id, full_name)`, { count: "exact" })
-    .eq("tenant_id", ctx.tenantId);
+    .eq("tenant_id", ctx.tenantId)
+    .eq("is_active", true);
 
   if (!ctx.isManager) {
     query = query.eq("assigned_agent_id", ctx.userId);
@@ -42,6 +46,51 @@ function buildCustomerQuery(
   if (kyc && kyc !== "all") query = query.eq("kyc_status", kyc);
 
   return query;
+}
+
+async function findRecentDuplicate(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  userId: string,
+  phone: string,
+  fullName: string
+) {
+  const since = new Date(Date.now() - DEDUPE_WINDOW_MS).toISOString();
+  const { data } = await admin
+    .from("customers")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("phone", phone)
+    .eq("full_name", fullName)
+    .eq("assigned_agent_id", userId)
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
+async function findSubmissionCustomer(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  submissionId: string
+) {
+  const { data: submission } = await admin
+    .from("customer_submissions")
+    .select("customer_id")
+    .eq("tenant_id", tenantId)
+    .eq("submission_id", submissionId)
+    .maybeSingle();
+
+  if (!submission?.customer_id) return null;
+
+  const { data: customer } = await admin
+    .from("customers")
+    .select("*")
+    .eq("id", submission.customer_id)
+    .maybeSingle();
+
+  return customer;
 }
 
 export async function GET(request: Request) {
@@ -67,31 +116,45 @@ export async function POST(request: Request) {
   if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
   if (ctx.role === "viewer") return apiError("FORBIDDEN", "Viewers cannot create customers", 403);
 
+  const submissionId = request.headers.get("X-Submission-Id")?.trim();
   const body = await request.json();
   const parsed = customerSchema.safeParse(body);
   if (!parsed.success) {
-    return apiError(
-      "VALIDATION_ERROR",
-      parsed.error.issues[0]?.message ?? "Invalid",
-      400
-    );
+    return validationApiError(parsed);
   }
 
   const admin = createAdminClient();
 
-  const { data: recentDuplicate } = await admin
-    .from("customers")
-    .select("*")
-    .eq("tenant_id", ctx.tenantId)
-    .eq("phone", parsed.data.phone)
-    .eq("assigned_agent_id", ctx.userId)
-    .gte("created_at", new Date(Date.now() - 60_000).toISOString())
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  if (submissionId) {
+    const existing = await findSubmissionCustomer(
+      admin,
+      ctx.tenantId,
+      submissionId
+    );
+    if (existing) {
+      return apiSuccess(existing, 200, { duplicate: true });
+    }
+  }
 
+  const recentDuplicate = await findRecentDuplicate(
+    admin,
+    ctx.tenantId,
+    ctx.userId,
+    parsed.data.phone,
+    parsed.data.full_name
+  );
   if (recentDuplicate) {
-    return apiSuccess(recentDuplicate, 200);
+    if (submissionId) {
+      await admin.from("customer_submissions").upsert(
+        {
+          tenant_id: ctx.tenantId,
+          submission_id: submissionId,
+          customer_id: recentDuplicate.id,
+        },
+        { onConflict: "tenant_id,submission_id" }
+      );
+    }
+    return apiSuccess(recentDuplicate, 200, { duplicate: true });
   }
 
   const customerCode = await generateCustomerCode(
@@ -115,6 +178,14 @@ export async function POST(request: Request) {
     .single();
 
   if (dbError) return apiError("SERVER_ERROR", dbError.message, 500);
+
+  if (submissionId) {
+    await admin.from("customer_submissions").insert({
+      tenant_id: ctx.tenantId,
+      submission_id: submissionId,
+      customer_id: data.id,
+    });
+  }
 
   await logAction({
     actorId: ctx.userId,

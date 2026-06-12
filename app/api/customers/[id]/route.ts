@@ -1,8 +1,9 @@
 import { getDashboardContext } from "@/lib/auth/dashboard-context";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { customerSchema } from "@/lib/utils/validators";
+import { customerUpdateSchema } from "@/lib/utils/validators";
 import { logAction } from "@/lib/audit";
 import { apiError, apiSuccess } from "@/lib/api/response";
+import { validationApiError } from "@/lib/api/zod-error";
 
 async function getCustomer(id: string, ctx: NonNullable<Awaited<ReturnType<typeof getDashboardContext>>["ctx"]>) {
   const admin = createAdminClient();
@@ -36,9 +37,9 @@ export async function PUT(
   if (!ctx) return apiError(error ?? "UNAUTHORIZED", "Not signed in", 401);
   if (ctx.role === "viewer") return apiError("FORBIDDEN", "Cannot edit", 403);
 
-  const parsed = customerSchema.safeParse(await request.json());
+  const parsed = customerUpdateSchema.safeParse(await request.json());
   if (!parsed.success) {
-    return apiError("VALIDATION_ERROR", "Invalid input", 400);
+    return validationApiError(parsed);
   }
 
   const admin = createAdminClient();
