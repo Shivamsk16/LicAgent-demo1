@@ -56,8 +56,8 @@ export function AuditLogTable({ tenantId }: { tenantId?: string }) {
           <Table>
             <TableHeader>
               <TableRow>
-                {["Time", "Actor", "Action", "Resource", "Details"].map((h) => (
-                  <TableHead key={h}>{h}</TableHead>
+                {["#", "Time", "Actor", "Action", "Resource", "Details"].map((h) => (
+                  <TableHead key={h} className={h === "#" ? "w-12" : undefined}>{h}</TableHead>
                 ))}
               </TableRow>
             </TableHeader>
@@ -70,8 +70,9 @@ export function AuditLogTable({ tenantId }: { tenantId?: string }) {
                 before_state: unknown;
                 after_state: unknown;
                 actor?: { full_name: string };
-              }) => (
+              }, index: number) => (
                 <TableRow key={log.id} className="align-top">
+                  <TableCell mono className="w-12 text-lic-neutral-500">{index + 1}</TableCell>
                   <TableCell className="whitespace-nowrap">
                     {formatDateTimeIST(log.created_at)}
                   </TableCell>

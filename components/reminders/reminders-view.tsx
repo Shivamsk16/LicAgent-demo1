@@ -118,8 +118,20 @@ export function RemindersView() {
           <Table>
             <TableHeader>
               <TableRow>
-                {["Customer", "Policy", "Due date", "Days", "Premium", "Reminder", "Status", "Actions"].map((h) => (
-                  <TableHead key={h}>{h}</TableHead>
+                {["#", "Customer", "Policy", "Due date", "Days", "Premium", "Reminder", "Status", "Actions"].map((h) => (
+                  <TableHead
+                    key={h}
+                    className={
+                      h === "#"
+                        ? "w-12"
+                        : h === "Days"
+                          ? "w-[120px] whitespace-nowrap text-right"
+                          : undefined
+                    }
+                    align={h === "Days" ? "right" : "left"}
+                  >
+                    {h}
+                  </TableHead>
                 ))}
               </TableRow>
             </TableHeader>
@@ -133,15 +145,16 @@ export function RemindersView() {
                 policy_id: string;
                 policy: { policy_number: string; premium_amount: number };
                 customer: { full_name: string };
-              }) => {
+              }, index: number) => {
                 const days = differenceInDays(new Date(r.due_date), new Date());
                 return (
                   <TableRow key={r.id} interactive>
+                    <TableCell mono className="w-12 text-lic-neutral-500">{index + 1}</TableCell>
                     <TableCell className="font-medium text-lic-neutral-900">{r.customer?.full_name}</TableCell>
                     <TableCell mono>{r.policy?.policy_number}</TableCell>
                     <TableCell>{formatDateIST(r.due_date)}</TableCell>
-                    <TableCell>
-                      <span className={cn("rounded-badge px-2 py-0.5 text-xs", urgencyClass(r.due_date))}>
+                    <TableCell className="w-[120px] whitespace-nowrap text-right">
+                      <span className={cn("inline-flex shrink-0 rounded-badge px-2 py-0.5 text-xs", urgencyClass(r.due_date))}>
                         {days < 0 ? `${Math.abs(days)}d overdue` : `${days}d`}
                       </span>
                     </TableCell>

@@ -191,10 +191,11 @@ export function PaymentsLedger() {
             <TableHeader sticky>
               <TableRow>
                 <TableHead className="w-10"><input type="checkbox" onChange={() => setSelected(selected.size === payments.length ? new Set() : new Set(payments.map((p) => p.id)))} checked={selected.size === payments.length && payments.length > 0} aria-label="Select all" /></TableHead>
+                <TableHead className="w-12">#</TableHead>
                 <SortableTableHead label="Date" column="payment_date" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} sticky />
                 <TableHead hideOnMobile className="hidden md:table-cell">Customer</TableHead>
                 <TableHead hideOnMobile className="hidden lg:table-cell">Policy</TableHead>
-                <SortableTableHead label="#" column="installment_number" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} />
+                <SortableTableHead label="Installment #" column="installment_number" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} />
                 <SortableTableHead label="Paid" column="amount_paid" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} align="right" />
                 <TableHead hideOnMobile className="hidden md:table-cell" align="right">Late fee</TableHead>
                 <TableHead hideOnMobile className="hidden lg:table-cell">Mode</TableHead>
@@ -204,7 +205,7 @@ export function PaymentsLedger() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments.map((p) => (
+              {payments.map((p, index) => (
                 <TableRow
                   key={p.id}
                   interactive
@@ -213,6 +214,7 @@ export function PaymentsLedger() {
                   navigateLabel={`View payment receipt ${p.receipt_number ?? p.id}`}
                 >
                   <TableCell><input type="checkbox" checked={selected.has(p.id)} onChange={() => setSelected((prev) => { const n = new Set(prev); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })} aria-label={`Select payment ${p.receipt_number ?? p.id}`} /></TableCell>
+                  <TableCell mono className="w-12 text-lic-neutral-500">{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
                   <TableCell mono sticky>{formatDateIST(p.payment_date)}</TableCell>
                   <TableCell hideOnMobile className="hidden md:table-cell truncate">{p.customer?.full_name}</TableCell>
                   <TableCell mono hideOnMobile className="hidden lg:table-cell">{p.policy?.policy_number}</TableCell>

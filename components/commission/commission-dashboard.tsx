@@ -258,6 +258,7 @@ export function CommissionDashboard() {
             <Table dense>
               <TableHeader sticky>
                 <TableRow>
+                  <TableHead className="w-12">#</TableHead>
                   <SortableTableHead label="Month" column="month" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} sticky />
                   <TableHead hideOnMobile className="hidden md:table-cell">Customer</TableHead>
                   <TableHead hideOnMobile className="hidden lg:table-cell">Policy #</TableHead>
@@ -274,7 +275,7 @@ export function CommissionDashboard() {
               <TableBody>
                 {commissions.length === 0 && (
                   <TableRow>
-                    <td colSpan={11} className="p-0">
+                    <td colSpan={12} className="p-0">
                       <EmptyState
                         icon={IndianRupee}
                         title="No commission yet"
@@ -286,8 +287,9 @@ export function CommissionDashboard() {
                     </td>
                   </TableRow>
                 )}
-                {commissions.map((r) => (
+                {commissions.map((r, index) => (
                   <TableRow key={r.id} interactive>
+                    <TableCell mono className="w-12 text-lic-neutral-500">{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
                     <TableCell mono sticky>{r.month}</TableCell>
                     <TableCell primary hideOnMobile className="hidden md:table-cell truncate">{r.policy?.customer?.full_name ?? "—"}</TableCell>
                     <TableCell mono hideOnMobile className="hidden lg:table-cell">{r.policy?.policy_number ?? "—"}</TableCell>

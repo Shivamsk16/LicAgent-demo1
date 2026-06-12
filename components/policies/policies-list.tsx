@@ -225,6 +225,7 @@ export function PoliciesList() {
             <TableHeader sticky>
               <TableRow>
                 <TableHead className="w-10"><input type="checkbox" checked={selected.size === policies.length} onChange={() => setSelected(selected.size === policies.length ? new Set() : new Set(policies.map((p) => p.id)))} /></TableHead>
+                <TableHead className="w-12">#</TableHead>
                 <SortableTableHead label="Policy #" column="policy_number" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} sticky />
                 <TableHead hideOnMobile className="hidden md:table-cell">Customer</TableHead>
                 <SortableTableHead label="Plan" column="plan_name" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} />
@@ -235,7 +236,7 @@ export function PoliciesList() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {policies.map((p) => (
+              {policies.map((p, index) => (
                 <TableRow
                   key={p.id}
                   interactive
@@ -244,6 +245,7 @@ export function PoliciesList() {
                   navigateLabel={`View policy ${p.policy_number}`}
                 >
                   <TableCell><input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} /></TableCell>
+                  <TableCell mono className="w-12 text-lic-neutral-500">{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
                   <TableCell primary mono sticky truncate>{p.policy_number}</TableCell>
                   <TableCell hideOnMobile className="hidden md:table-cell truncate">{p.customer?.full_name}</TableCell>
                   <TableCell truncate>{p.plan_name}</TableCell>

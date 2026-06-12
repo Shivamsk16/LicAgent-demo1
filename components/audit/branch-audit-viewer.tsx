@@ -179,21 +179,22 @@ export function BranchAuditViewer() {
           <Table dense>
             <TableHeader>
               <TableRow>
-                {["Time", "Actor", "Action", "Resource", "Details"].map((h) => (
-                  <TableHead key={h}>{h}</TableHead>
+                {["#", "Time", "Actor", "Action", "Resource", "Details"].map((h) => (
+                  <TableHead key={h} className={h === "#" ? "w-12" : undefined}>{h}</TableHead>
                 ))}
               </TableRow>
             </TableHeader>
             <TableBody>
               {logs.length === 0 && (
                 <TableRow>
-                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-lic-neutral-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-lic-neutral-500">
                     No audit entries found.
                   </td>
                 </TableRow>
               )}
-              {logs.map((log) => (
+              {logs.map((log, index) => (
                 <TableRow key={log.id} className="align-top">
+                  <TableCell mono className="w-12 text-lic-neutral-500">{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatDateTimeIST(log.created_at)}</TableCell>
                   <TableCell>{log.actor?.full_name ?? "System"}</TableCell>
                   <TableCell mono>{log.action}</TableCell>
