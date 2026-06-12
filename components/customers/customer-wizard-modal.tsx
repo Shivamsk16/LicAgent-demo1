@@ -26,6 +26,7 @@ import {
   customerWizardSchema,
   type CustomerWizardFormValues,
 } from "@/lib/forms/customer-wizard-schema";
+import { useCreateCustomer } from "@/lib/hooks/use-create-customer";
 import type { Customer } from "@/types/business";
 
 export function CustomerWizardModal({
@@ -40,20 +41,23 @@ export function CustomerWizardModal({
   onCustomerCreated?: (customer: Customer) => void;
 }) {
   const submittingRef = useRef(false);
+  const createCustomer = useCreateCustomer();
   const [step, setStep] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [draftSaved, setDraftSaved] = useState(false);
   const initialSnapshotRef = useRef("");
 
+  const isSubmitting = createCustomer.isPending;
+
   const form = useForm<CustomerWizardFormValues>({
     resolver: zodResolver(customerWizardSchema),
     defaultValues: customerWizardDefaultValues(),
-    mode: "onTouched",
+    mode: "onChange",
   });
 
   const {
     register,
+    control,
     reset,
     trigger,
     watch,
@@ -114,12 +118,14 @@ export function CustomerWizardModal({
   }
 
   async function goNext() {
+    if (isSubmitting) return;
     const valid = await validateCurrentStep();
     if (!valid) return;
     setStep((s) => Math.min(s + 1, CUSTOMER_WIZARD_STEPS.length - 1));
   }
 
   function goPrevious() {
+    if (isSubmitting) return;
     setStep((s) => Math.max(s - 1, 0));
   }
 
@@ -130,7 +136,7 @@ export function CustomerWizardModal({
   }
 
   async function saveCustomer() {
-    if (submittingRef.current) return;
+    if (submittingRef.current || createCustomer.isPending) return;
 
     const valid = await trigger();
     if (!valid) {
@@ -144,32 +150,24 @@ export function CustomerWizardModal({
     }
 
     submittingRef.current = true;
-    setSubmitting(true);
     setSubmitError("");
 
     try {
-      const res = await fetch("/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(customerWizardApiPayload(values)),
-      });
-      const json = await res.json();
-
-      if (!json.success) {
-        setSubmitError(json.error?.message ?? "Failed to create customer");
-        return;
-      }
+      const result = await createCustomer.mutateAsync(
+        customerWizardApiPayload(values)
+      );
 
       localStorage.removeItem(CUSTOMER_WIZARD_DRAFT_KEY);
       initialSnapshotRef.current = JSON.stringify(values);
-      onCustomerCreated?.(json.data);
+      onCustomerCreated?.(result.customer);
       onSuccess?.();
       onOpenChange(false);
-    } catch {
-      setSubmitError("Failed to create customer");
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Failed to create customer"
+      );
     } finally {
       submittingRef.current = false;
-      setSubmitting(false);
     }
   }
 
@@ -178,7 +176,7 @@ export function CustomerWizardModal({
       open={open}
       onOpenChange={onOpenChange}
       onCloseAttempt={handleCloseAttempt}
-      preventClose={submitting}
+      preventClose={isSubmitting}
     >
       <DialogContent
         size="crm"
@@ -211,6 +209,8 @@ export function CustomerWizardModal({
           <CustomerFormWizard
             step={step}
             register={register}
+            control={control}
+            trigger={trigger}
             errors={errors}
             values={values}
             submitError={submitError}
@@ -222,7 +222,7 @@ export function CustomerWizardModal({
         <DialogFooter className="px-5 py-3">
           <ModalFooterActions
             variant="wizard"
-            submitting={submitting}
+            submitting={isSubmitting}
             onCancel={handleCancel}
             showPrevious={step > 0}
             onPrevious={goPrevious}
@@ -231,7 +231,7 @@ export function CustomerWizardModal({
             onSave={saveCustomer}
             onSaveDraft={isLastStep ? saveDraft : undefined}
             formId="customer-wizard-form"
-            saveLabel="Save"
+            saveLabel="Save Customer"
           />
         </DialogFooter>
       </DialogContent>

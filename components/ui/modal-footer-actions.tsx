@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
@@ -65,6 +66,9 @@ export function ModalFooterActions(props: ModalFooterActionsProps) {
             </Button>
           )}
           <Button type="button" onClick={props.onSave} disabled={submitting}>
+            {submitting && (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+            )}
             {submitting
               ? "Saving…"
               : props.saveLabel ?? "Save"}
@@ -126,6 +130,9 @@ export function ModalFooterActions(props: ModalFooterActionsProps) {
               onClick={props.onSave}
               disabled={submitting}
             >
+              {submitting && (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+              )}
               {submitting
                 ? "Saving…"
                 : props.saveLabel ?? "Save"}

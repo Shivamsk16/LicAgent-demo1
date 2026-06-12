@@ -20,6 +20,7 @@ import { INDIAN_STATES } from "@/lib/constants/states";
 import { ReviewSummary, formatLabel } from "@/components/shared/review-summary";
 import { formatINR } from "@/lib/utils/currency";
 import { customerSchema } from "@/lib/utils/validators";
+import { digitsOnly } from "@/lib/validation/customer";
 import {
   customerPayloadForValidation,
   customerStep0Schema,
@@ -79,6 +80,28 @@ export function CustomerForm({
       delete next[field];
       return next;
     });
+  }
+
+  function setPhoneField(field: "phone" | "alternate_phone", value: string) {
+    set(field, digitsOnly(value));
+  }
+
+  function validateField(field: keyof typeof form) {
+    const payload = customerPayloadForValidation(form);
+    const parsed = customerSchema.safeParse(payload);
+    if (parsed.success) {
+      setFieldErrors((prev) => {
+        if (!prev[field]) return prev;
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+      return;
+    }
+    const issue = parsed.error.issues.find((i) => i.path[0] === field);
+    if (issue) {
+      setFieldErrors((prev) => ({ ...prev, [field]: issue.message }));
+    }
   }
 
   function advance(
@@ -230,8 +253,11 @@ export function CustomerForm({
                 <FormField label="Phone" required hint="10-digit mobile" error={fieldErrors.phone}>
                   <Input
                     id="field-phone"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={form.phone}
-                    onChange={(e) => set("phone", e.target.value)}
+                    onChange={(e) => setPhoneField("phone", e.target.value)}
+                    onBlur={() => validateField("phone")}
                     className={fieldErrorClass(!!fieldErrors.phone)}
                     aria-invalid={!!fieldErrors.phone}
                   />
@@ -239,9 +265,13 @@ export function CustomerForm({
                 <FormField label="Alternate phone" hint="Optional" error={fieldErrors.alternate_phone}>
                   <Input
                     id="field-alternate_phone"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={form.alternate_phone}
-                    onChange={(e) => set("alternate_phone", e.target.value)}
+                    onChange={(e) => setPhoneField("alternate_phone", e.target.value)}
+                    onBlur={() => validateField("alternate_phone")}
                     className={fieldErrorClass(!!fieldErrors.alternate_phone)}
+                    aria-invalid={!!fieldErrors.alternate_phone}
                   />
                 </FormField>
               </FormRow>
@@ -251,7 +281,9 @@ export function CustomerForm({
                   type="email"
                   value={form.email}
                   onChange={(e) => set("email", e.target.value)}
+                  onBlur={() => validateField("email")}
                   className={fieldErrorClass(!!fieldErrors.email)}
+                  aria-invalid={!!fieldErrors.email}
                 />
               </FormField>
             </FormSection>

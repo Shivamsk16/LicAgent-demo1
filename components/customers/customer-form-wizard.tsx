@@ -1,8 +1,11 @@
 "use client";
 
 import {
+  Controller,
+  type Control,
   type FieldErrors,
   type UseFormRegister,
+  type UseFormTrigger,
 } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +16,7 @@ import { ReviewSummary, formatLabel } from "@/components/shared/review-summary";
 import { formatINR } from "@/lib/utils/currency";
 import { INDIAN_STATES } from "@/lib/constants/states";
 import { fieldErrorClass } from "@/lib/forms/step-validation";
+import { digitsOnly } from "@/lib/validation/customer";
 import type { CustomerWizardFormValues } from "@/lib/forms/customer-wizard-schema";
 
 function FieldError({ message }: { message?: string }) {
@@ -37,6 +41,8 @@ function FormColumn({ children }: { children: React.ReactNode }) {
 export function CustomerFormWizard({
   step,
   register,
+  control,
+  trigger,
   errors,
   values,
   submitError,
@@ -45,6 +51,8 @@ export function CustomerFormWizard({
 }: {
   step: number;
   register: UseFormRegister<CustomerWizardFormValues>;
+  control: Control<CustomerWizardFormValues>;
+  trigger: UseFormTrigger<CustomerWizardFormValues>;
   errors: FieldErrors<CustomerWizardFormValues>;
   values: CustomerWizardFormValues;
   submitError?: string;
@@ -117,20 +125,47 @@ export function CustomerFormWizard({
               <Label htmlFor="field-phone" required>
                 Phone
               </Label>
-              <Input
-                id="field-phone"
-                {...register("phone")}
-                className={fieldErrorClass(!!errors.phone)}
-                aria-invalid={!!errors.phone}
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="field-phone"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={field.value}
+                    onChange={(e) => field.onChange(digitsOnly(e.target.value))}
+                    onBlur={() => {
+                      field.onBlur();
+                      void trigger("phone");
+                    }}
+                    className={fieldErrorClass(!!errors.phone)}
+                    aria-invalid={!!errors.phone}
+                  />
+                )}
               />
               <FieldError message={errors.phone?.message} />
             </div>
             <div>
               <Label htmlFor="field-alternate_phone">Alternate phone</Label>
-              <Input
-                id="field-alternate_phone"
-                {...register("alternate_phone")}
-                className={fieldErrorClass(!!errors.alternate_phone)}
+              <Controller
+                name="alternate_phone"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="field-alternate_phone"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(digitsOnly(e.target.value))}
+                    onBlur={() => {
+                      field.onBlur();
+                      void trigger("alternate_phone");
+                    }}
+                    className={fieldErrorClass(!!errors.alternate_phone)}
+                    aria-invalid={!!errors.alternate_phone}
+                  />
+                )}
               />
               <FieldError message={errors.alternate_phone?.message} />
             </div>
@@ -139,8 +174,13 @@ export function CustomerFormWizard({
               <Input
                 id="field-email"
                 type="email"
-                {...register("email")}
+                {...register("email", {
+                  onBlur: () => {
+                    void trigger("email");
+                  },
+                })}
                 className={fieldErrorClass(!!errors.email)}
+                aria-invalid={!!errors.email}
               />
               <FieldError message={errors.email?.message} />
             </div>
