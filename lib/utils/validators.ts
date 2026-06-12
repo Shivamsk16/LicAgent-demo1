@@ -1,35 +1,11 @@
 import { z } from "zod";
-import { INDIAN_STATES } from "@/lib/constants/states";
 
-const phoneSchema = z.string().regex(/^[6-9]\d{9}$/, "Invalid Indian mobile number");
-const panSchema = z
-  .string()
-  .regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, "Invalid PAN format")
-  .optional()
-  .or(z.literal(""));
-
-export const customerSchema = z.object({
-  full_name: z.string().min(2),
-  date_of_birth: z.string().optional(),
-  gender: z.enum(["male", "female", "other"]).optional(),
-  marital_status: z.enum(["single", "married", "widowed", "divorced"]).optional(),
-  occupation: z.string().optional(),
-  annual_income: z.number().optional(),
-  phone: phoneSchema,
-  alternate_phone: phoneSchema.optional().or(z.literal("")),
-  email: z.string().email().optional().or(z.literal("")),
-  address_line1: z.string().optional(),
-  address_line2: z.string().optional(),
-  city: z.string().min(1),
-  state: z.string().refine((s) => INDIAN_STATES.includes(s as (typeof INDIAN_STATES)[number])),
-  pincode: z.string().regex(/^\d{6}$/).optional().or(z.literal("")),
-  pan_number: panSchema,
-  aadhaar_last4: z.string().regex(/^\d{4}$/).optional().or(z.literal("")),
-  nominee_name: z.string().optional(),
-  nominee_relation: z.string().optional(),
-  nominee_dob: z.string().optional(),
-  notes: z.string().optional(),
-});
+export {
+  customerSchema,
+  customerUpdateSchema,
+  customerFormSchema,
+  customerApiObjectSchema,
+} from "@/lib/validation/customer";
 
 export const policySchema = z.object({
   customer_id: z.string().uuid(),

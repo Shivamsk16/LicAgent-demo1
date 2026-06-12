@@ -1,13 +1,14 @@
 import { z } from "zod";
-import { customerSchema } from "@/lib/utils/validators";
+import { customerApiObjectSchema } from "@/lib/utils/validators";
 
-export const customerStep0Schema = customerSchema.pick({
+export const customerStep0Schema = customerApiObjectSchema.pick({
   full_name: true,
   phone: true,
   email: true,
+  alternate_phone: true,
 });
 
-export const customerStep1Schema = customerSchema.pick({
+export const customerStep1Schema = customerApiObjectSchema.pick({
   city: true,
   state: true,
   pincode: true,

@@ -1,53 +1,7 @@
-import { z } from "zod";
-import { INDIAN_STATES } from "@/lib/constants/states";
+import { customerFormSchema } from "@/lib/validation/customer";
+import type { z } from "zod";
 
-const phoneField = z
-  .string()
-  .regex(/^[6-9]\d{9}$/, "Invalid Indian mobile number");
-
-export const customerWizardSchema = z.object({
-  full_name: z.string().min(2, "Full name is required"),
-  date_of_birth: z.string().optional(),
-  gender: z.string().optional(),
-  marital_status: z.string().optional(),
-  occupation: z.string().optional(),
-  annual_income: z.string().optional(),
-  phone: phoneField,
-  alternate_phone: z
-    .string()
-    .regex(/^[6-9]\d{9}$/, "Invalid Indian mobile number")
-    .optional()
-    .or(z.literal("")),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
-  address_line1: z.string().optional(),
-  address_line2: z.string().optional(),
-  city: z.string().min(1, "City is required"),
-  state: z
-    .string()
-    .min(1, "State is required")
-    .refine((s) =>
-      INDIAN_STATES.includes(s as (typeof INDIAN_STATES)[number])
-    ),
-  pincode: z
-    .string()
-    .regex(/^\d{6}$/, "Pincode must be 6 digits")
-    .optional()
-    .or(z.literal("")),
-  pan_number: z
-    .string()
-    .regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, "Invalid PAN format")
-    .optional()
-    .or(z.literal("")),
-  aadhaar_last4: z
-    .string()
-    .regex(/^\d{4}$/, "Enter last 4 digits")
-    .optional()
-    .or(z.literal("")),
-  nominee_name: z.string().optional(),
-  nominee_relation: z.string().optional(),
-  nominee_dob: z.string().optional(),
-  notes: z.string().optional(),
-});
+export const customerWizardSchema = customerFormSchema;
 
 export type CustomerWizardFormValues = z.infer<typeof customerWizardSchema>;
 

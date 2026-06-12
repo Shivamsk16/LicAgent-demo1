@@ -6,7 +6,8 @@ describe("customer step validation", () => {
   it("blocks step 0 without required fields", () => {
     const result = validateStep(customerStep0Schema, {
       full_name: "",
-      phone: "123",
+      phone: "12345",
+      alternate_phone: "",
       email: "",
     });
     expect(result.ok).toBe(false);
