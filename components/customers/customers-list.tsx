@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTableBulkBar } from "@/components/shared/data-table-bulk-bar";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { ConfirmModal } from "@/components/ui/modal";
 import { CustomerWizardModal } from "@/components/customers/customer-wizard-modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -33,7 +33,8 @@ import { useSort } from "@/lib/hooks/use-sort";
 import { downloadCSV, rowsToCSV } from "@/lib/utils/csv";
 import { toast } from "@/lib/toast";
 import type { PaginatedResult } from "@/lib/api/list-params";
-import { Plus, Search, X } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
 import { useTenantStore } from "@/store/tenant";
 import type { Customer } from "@/types/business";
 
@@ -47,10 +48,14 @@ const kycVariant: Record<string, "pending" | "active" | "trial" | "suspended" | 
 const KYC_OPTIONS = [
   { value: "all", label: "All KYC" },
   { value: "pending", label: "Pending" },
-  { value: "documents_uploaded", label: "Documents uploaded" },
+  { value: "documents_uploaded", label: "Documents Uploaded" },
   { value: "verified", label: "Verified" },
   { value: "rejected", label: "Rejected" },
 ];
+
+const KYC_LABELS: Record<string, string> = Object.fromEntries(
+  KYC_OPTIONS.filter((o) => o.value !== "all").map((o) => [o.value, o.label])
+);
 
 const PAGE_SIZE = 25;
 
@@ -61,6 +66,7 @@ export function CustomersList() {
   const agentId = searchParams.get("agent");
   const agentName = searchParams.get("agent_name");
   const isManager = useTenantStore((s) => s.isManager);
+  const canDelete = usePermission("customers.delete");
 
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [kyc, setKyc] = useState(() => searchParams.get("kyc") ?? "all");
@@ -71,6 +77,8 @@ export function CustomersList() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [assignAgent, setAssignAgent] = useState("");
   const [bulkKyc, setBulkKyc] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { sort, order, toggleSort } = useSort("created_at", "desc");
   const debouncedSearch = useDebouncedValue(search);
 
@@ -199,6 +207,28 @@ export function CustomersList() {
     router.push("/dashboard/customers");
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/customers/${deleteTarget.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!json.success) {
+        toast.error("Delete failed", json.error?.message ?? "Could not delete customer");
+        return;
+      }
+      toast.success("Customer deleted");
+      setDeleteTarget(null);
+      qc.invalidateQueries({ queryKey: ["customers"] });
+    } catch {
+      toast.error("Delete failed", "Something went wrong.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -303,7 +333,7 @@ export function CustomersList() {
           </Button>
         </Alert>
       ) : isLoading ? (
-        <TableSkeleton rows={10} cols={8} />
+        <TableSkeleton rows={10} cols={9} />
       ) : customers.length === 0 ? (
         <SmartEmptyState
           entity="customers"
@@ -332,17 +362,18 @@ export function CustomersList() {
                 <TableHead className="w-10">
                   <input type="checkbox" checked={selected.size === customers.length && customers.length > 0} onChange={toggleAll} aria-label="Select all" />
                 </TableHead>
+                <TableHead className="w-12">#</TableHead>
                 <SortableTableHead label="Code" column="customer_code" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} sticky />
                 <SortableTableHead label="Name" column="full_name" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} />
                 <SortableTableHead label="Phone" column="phone" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} hideOnMobile />
                 <SortableTableHead label="City" column="city" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} className="hidden lg:table-cell" />
                 <SortableTableHead label="KYC" column="kyc_status" activeSort={sort} activeOrder={order} onSort={(c) => { toggleSort(c); setPage(1); }} />
                 <TableHead hideOnMobile className="hidden md:table-cell">Agent</TableHead>
-                <TableHead align="right" />
+                <TableHead align="right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((c) => (
+              {customers.map((c, index) => (
                 <TableRow
                   key={c.id}
                   interactive
@@ -353,21 +384,50 @@ export function CustomersList() {
                   <TableCell>
                     <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)} aria-label={`Select ${c.full_name}`} />
                   </TableCell>
+                  <TableCell mono className="w-12 text-lic-neutral-500">
+                    {(page - 1) * PAGE_SIZE + index + 1}
+                  </TableCell>
                   <TableCell mono sticky truncate>{c.customer_code ?? "—"}</TableCell>
                   <TableCell primary truncate>{c.full_name}</TableCell>
                   <TableCell mono hideOnMobile>{c.phone}</TableCell>
                   <TableCell hideOnMobile className="hidden lg:table-cell">{c.city ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={kycVariant[c.kyc_status] ?? "pending"} dot>{c.kyc_status}</Badge>
+                    <Badge variant={kycVariant[c.kyc_status] ?? "pending"} dot>
+                      {KYC_LABELS[c.kyc_status] ?? c.kyc_status}
+                    </Badge>
                   </TableCell>
                   <TableCell hideOnMobile className="hidden md:table-cell">{c.agent?.full_name ?? "—"}</TableCell>
                   <TableCell align="right" data-row-action>
-                    <Link
-                      href={`/dashboard/customers/${c.id}`}
-                      className={buttonVariants({ variant: "ghost", size: "sm" })}
-                    >
-                      View
-                    </Link>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="Edit customer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/dashboard/customers/${c.id}/edit`);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" strokeWidth={1.75} />
+                      </Button>
+                      {canDelete && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-lic-red-600 hover:text-lic-red-700"
+                          aria-label="Delete customer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(c);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -376,6 +436,21 @@ export function CustomersList() {
           <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
         </TableContainer>
       )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={confirmDelete}
+        title="Delete customer?"
+        description={
+          deleteTarget
+            ? `This will remove ${deleteTarget.full_name} from your customer list. This action cannot be undone. Customers with active policies cannot be deleted.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+      />
     </>
   );
 }
