@@ -24,6 +24,8 @@ export interface Customer {
   nominee_dob: string | null;
   kyc_status: string;
   notes: string | null;
+  created_at?: string;
+  updated_at?: string;
   agent?: { full_name: string };
 }
 

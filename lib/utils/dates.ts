@@ -10,6 +10,12 @@ export function formatDateTimeIST(date: string | Date) {
   return format(d, "dd MMM yyyy HH:mm");
 }
 
+/** e.g. 12 Jun 2026, 10:45 AM IST */
+export function formatCustomerTimestamp(date: string | Date) {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return `${format(d, "d MMM yyyy, h:mm a")} IST`;
+}
+
 export function relativeTime(date: string | Date) {
   const d = typeof date === "string" ? new Date(date) : date;
   return formatDistanceToNow(d, { addSuffix: true });

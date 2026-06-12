@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PolicyWizardModal } from "@/components/policies/policy-wizard-modal";
 import { PageHeader } from "@/components/shared/page-header";
-import { formatDateIST } from "@/lib/utils/dates";
+import { formatCustomerTimestamp, formatDateIST } from "@/lib/utils/dates";
 import { formatINR } from "@/lib/utils/currency";
 import type { Customer, Policy, Payment } from "@/types/business";
 import { KycDocuments } from "@/components/customers/kyc-documents";
@@ -155,6 +155,8 @@ export function CustomerDetail({ customerId }: { customerId: string }) {
       {tab === "Personal" && (
         <dl className="divide-y divide-black/[0.04]">
           {[
+            ["Created Date", customer.created_at ? formatCustomerTimestamp(customer.created_at) : null],
+            ["Last Updated", customer.updated_at ? formatCustomerTimestamp(customer.updated_at) : null],
             ["Email", customer.email],
             ["Alternate phone", customer.alternate_phone],
             ["Address", [customer.address_line1, customer.address_line2].filter(Boolean).join(", ")],
